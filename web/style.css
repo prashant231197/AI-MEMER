@@ -758,6 +758,18 @@ button:disabled {
   padding: 24px;
 }
 
+.modal-backdrop.is-hidden,
+.modal-backdrop[style*="display: none"],
+.modal-backdrop[style*="display:none"] {
+  display: none !important;
+}
+
+.modal-backdrop.is-open,
+.modal-backdrop[style*="display: flex"],
+.modal-backdrop[style*="display:flex"] {
+  display: flex !important;
+}
+
 .modal-window {
   background: var(--bg-elevated);
   border: 1px solid rgba(255, 255, 255, 0.12);
@@ -2622,11 +2634,22 @@ button:disabled {
     margin: 0 !important;
     border: none !important;
     z-index: 1000 !important;
-    display: flex !important;
     align-items: stretch !important;
     justify-content: stretch !important;
     background: rgba(8, 10, 18, 0.98) !important;
     overflow: hidden !important;
+  }
+
+  .modal-backdrop.is-hidden,
+  .modal-backdrop[style*="display: none"],
+  .modal-backdrop[style*="display:none"] {
+    display: none !important;
+  }
+
+  .modal-backdrop.is-open,
+  .modal-backdrop[style*="display: flex"],
+  .modal-backdrop[style*="display:flex"] {
+    display: flex !important;
   }
 
   .modal-window, .reel-window, .ig-modal-window, .ig-publish-window, .vault-window {
@@ -2668,10 +2691,30 @@ button:disabled {
   }
 
   .modal-close-btn {
-    width: 36px !important;
-    height: 36px !important;
-    font-size: 16px !important;
+    width: 42px !important;
+    height: 42px !important;
+    min-width: 42px !important;
+    min-height: 42px !important;
+    border-radius: 50% !important;
+    background: rgba(255, 255, 255, 0.16) !important;
+    border: 1px solid rgba(255, 255, 255, 0.28) !important;
+    color: #ffffff !important;
+    font-size: 18px !important;
+    font-weight: 700 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    cursor: pointer !important;
+    touch-action: manipulation !important;
+    -webkit-tap-highlight-color: transparent !important;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5) !important;
     flex-shrink: 0 !important;
+    transition: transform 0.15s ease, background 0.15s ease !important;
+  }
+
+  .modal-close-btn:active {
+    background: rgba(239, 68, 68, 0.5) !important;
+    transform: scale(0.92) !important;
   }
 
   .modal-body, .reel-body, .ig-modal-body, .ig-publish-body, .vault-body {

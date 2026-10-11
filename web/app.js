@@ -226,6 +226,17 @@ const reelCtx = elements.reelCanvas ? elements.reelCanvas.getContext('2d') : nul
    INITIALIZATION
    ========================================================================== */
 function init() {
+  // Ensure all modals are cleanly closed on startup
+  [
+    elements.studioModal || document.getElementById('studioModal'),
+    elements.reelModal || document.getElementById('reelModal'),
+    elements.vaultModal || document.getElementById('vaultModal'),
+    elements.instagramModal || document.getElementById('instagramModal'),
+    elements.igPublishModal || document.getElementById('igPublishModal')
+  ].forEach(m => {
+    if (m) hideModalElement(m);
+  });
+
   updateVaultCount();
   setupEventListeners();
   setMobileViewMode('feed');
@@ -502,6 +513,42 @@ function setupMobileEventListeners() {
       openVaultModal();
     });
   }
+
+  // 3. Reliable Modal Close Listeners for both touch and click
+  const closeHandlers = [
+    { id: 'closeStudioBtn', fn: closeStudioModal },
+    { id: 'closeReelBtn', fn: closeReelStudio },
+    { id: 'closeVaultBtn', fn: closeVaultModal },
+    { id: 'closeInstagramBtn', fn: closeInstagramModal },
+    { id: 'closeIgPublishBtn', fn: closeIgPublishModal }
+  ];
+
+  closeHandlers.forEach(({ id, fn }) => {
+    const btn = document.getElementById(id);
+    if (btn) {
+      const handleClose = (e) => {
+        if (e) {
+          e.preventDefault();
+          e.stopPropagation();
+        }
+        fn();
+      };
+      btn.addEventListener('click', handleClose);
+      btn.addEventListener('touchend', handleClose, { passive: false });
+    }
+  });
+
+  // Modal Backdrop click to dismiss
+  ['studioModal', 'reelModal', 'vaultModal', 'instagramModal', 'igPublishModal'].forEach(id => {
+    const modalEl = document.getElementById(id);
+    if (modalEl) {
+      modalEl.addEventListener('click', (e) => {
+        if (e.target === modalEl) {
+          hideModalElement(modalEl);
+        }
+      });
+    }
+  });
 }
 
 function setMobileViewMode(mode) {
@@ -1449,14 +1496,33 @@ function roundRect(ctx, x, y, width, height, radius) {
 /* ==========================================================================
    MODAL & EXPORT HANDLERS
    ========================================================================== */
+function showModalElement(modal) {
+  if (!modal) return;
+  modal.classList.remove('is-hidden');
+  modal.classList.add('is-open');
+  modal.style.setProperty('display', 'flex', 'important');
+  document.body.style.overflow = 'hidden';
+}
+
+function hideModalElement(modal) {
+  if (!modal) return;
+  modal.classList.remove('is-open');
+  modal.classList.add('is-hidden');
+  modal.style.setProperty('display', 'none', 'important');
+  const anyOpen = document.querySelector('.modal-backdrop.is-open:not(.is-hidden)');
+  if (!anyOpen) {
+    document.body.style.overflow = '';
+  }
+}
+
 function openStudioModal() {
-  elements.studioModal.style.display = 'flex';
+  showModalElement(elements.studioModal);
   updateTemplateSelectionUI();
   renderCanvas();
 }
 
 function closeStudioModal() {
-  elements.studioModal.style.display = 'none';
+  hideModalElement(elements.studioModal);
 }
 
 function downloadMeme() {
@@ -1500,11 +1566,11 @@ function saveMemeToVault() {
 
 function openVaultModal() {
   renderVaultGrid();
-  elements.vaultModal.style.display = 'flex';
+  showModalElement(elements.vaultModal);
 }
 
 function closeVaultModal() {
-  elements.vaultModal.style.display = 'none';
+  hideModalElement(elements.vaultModal);
 }
 
 function updateVaultCount() {
@@ -2058,7 +2124,7 @@ function openReelStudio(prefilledHeadline = '') {
   }
 
   // Display 9:16 modal
-  modal.style.display = 'flex';
+  showModalElement(modal);
 
   // Ensure video element has a source
   const vid = elements.reelVideoSource || document.getElementById('reelVideoSource');
@@ -2080,7 +2146,7 @@ function openReelStudio(prefilledHeadline = '') {
 
 function closeReelStudio() {
   const modal = elements.reelModal || document.getElementById('reelModal');
-  if (modal) modal.style.display = 'none';
+  if (modal) hideModalElement(modal);
 
   const vid = elements.reelVideoSource || document.getElementById('reelVideoSource');
   if (vid) {
@@ -2614,9 +2680,7 @@ function updateInstagramUI() {
 }
 
 function openInstagramModal() {
-  if (elements.instagramModal) {
-    elements.instagramModal.style.display = 'flex';
-  }
+  showModalElement(elements.instagramModal);
   if (elements.igStatusMsg) {
     elements.igStatusMsg.style.display = 'none';
     elements.igStatusMsg.textContent = '';
@@ -2625,9 +2689,7 @@ function openInstagramModal() {
 }
 
 function closeInstagramModal() {
-  if (elements.instagramModal) {
-    elements.instagramModal.style.display = 'none';
-  }
+  hideModalElement(elements.instagramModal);
 }
 
 function setupInstagramEventListeners() {
@@ -2969,7 +3031,7 @@ function openPublishModalForMeme() {
   if (elements.igPublishResultBox) elements.igPublishResultBox.style.display = 'none';
   if (elements.confirmPublishIgBtn) elements.confirmPublishIgBtn.disabled = false;
 
-  if (elements.igPublishModal) elements.igPublishModal.style.display = 'flex';
+  if (elements.igPublishModal) showModalElement(elements.igPublishModal);
 }
 
 async function openPublishModalForReel() {
@@ -3069,12 +3131,12 @@ async function openPublishModalForReel() {
   if (elements.igPublishResultBox) elements.igPublishResultBox.style.display = 'none';
   if (elements.confirmPublishIgBtn) elements.confirmPublishIgBtn.disabled = false;
 
-  if (elements.igPublishModal) elements.igPublishModal.style.display = 'flex';
+  if (elements.igPublishModal) showModalElement(elements.igPublishModal);
 }
 
 function closeIgPublishModal() {
   if (elements.igPublishModal) {
-    elements.igPublishModal.style.display = 'none';
+    hideModalElement(elements.igPublishModal);
   }
   if (elements.igPublishVidPreview) {
     elements.igPublishVidPreview.pause();
@@ -3201,6 +3263,12 @@ async function executeInstagramPublish() {
 }
 
 // Global window helpers for inline HTML onclick handlers
+window.openStudioModal = openStudioModal;
+window.closeStudioModal = closeStudioModal;
+window.openReelStudio = openReelStudio;
+window.closeReelStudio = closeReelStudio;
+window.openVaultModal = openVaultModal;
+window.closeVaultModal = closeVaultModal;
 window.openInstagramModal = openInstagramModal;
 window.closeInstagramModal = closeInstagramModal;
 window.closeIgPublishModal = closeIgPublishModal;

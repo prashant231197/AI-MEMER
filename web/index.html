@@ -12,7 +12,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800;900&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=9.0">
+  <link rel="stylesheet" href="style.css?v=11.0">
 </head>
 <body>
   <!-- Ambient background glow elements -->
@@ -186,14 +186,14 @@
   </div>
 
   <!-- FULL MEME STUDIO MODAL -->
-  <div class="modal-backdrop" id="studioModal" style="display: none;">
+  <div class="modal-backdrop is-hidden" id="studioModal" style="display: none !important;">
     <div class="modal-window">
       <div class="modal-header">
         <div class="modal-title-group">
           <h2 class="modal-title">🎨 Meme Studio & AI Punchline Lab</h2>
           <span class="modal-subtitle">Turn today's news into viral graphic memes</span>
         </div>
-        <button id="closeStudioBtn" class="modal-close-btn" title="Close Studio">✕</button>
+        <button id="closeStudioBtn" class="modal-close-btn" title="Close Studio" onclick="closeStudioModal()">✕</button>
       </div>
 
       <div class="modal-body">
@@ -354,14 +354,14 @@
   </div>
 
   <!-- REEL MAKER STUDIO MODAL (9:16 VERTICAL VIDEO) -->
-  <div class="modal-backdrop" id="reelModal" style="display: none;">
+  <div class="modal-backdrop is-hidden" id="reelModal" style="display: none !important;">
     <div class="modal-window reel-window">
       <div class="modal-header">
         <div class="modal-title-group">
           <h2 class="modal-title">🎬 AI Reel Studio & Video Meme Creator</h2>
           <span class="modal-subtitle">Create viral 9:16 vertical reels for Instagram, Shorts & TikTok</span>
         </div>
-        <button id="closeReelBtn" class="modal-close-btn" title="Close Reel Studio">✕</button>
+        <button id="closeReelBtn" class="modal-close-btn" title="Close Reel Studio" onclick="closeReelStudio()">✕</button>
       </div>
 
       <div class="modal-body reel-body">
@@ -518,14 +518,14 @@
   </div>
 
   <!-- SAVED MEMES VAULT MODAL -->
-  <div class="modal-backdrop" id="vaultModal" style="display: none;">
+  <div class="modal-backdrop is-hidden" id="vaultModal" style="display: none !important;">
     <div class="modal-window vault-window">
       <div class="modal-header">
         <div class="modal-title-group">
           <h2 class="modal-title">📁 Your Saved Meme Vault</h2>
           <span class="modal-subtitle">Locally preserved memes created from today's news</span>
         </div>
-        <button id="closeVaultBtn" class="modal-close-btn">✕</button>
+        <button id="closeVaultBtn" class="modal-close-btn" title="Close Vault" onclick="closeVaultModal()">✕</button>
       </div>
       <div class="modal-body vault-body">
         <div class="vault-grid" id="vaultGrid">
@@ -536,14 +536,14 @@
   </div>
 
   <!-- INSTAGRAM ACCOUNT CONNECTION MODAL -->
-  <div class="modal-backdrop" id="instagramModal" style="display: none;">
+  <div class="modal-backdrop is-hidden" id="instagramModal" style="display: none !important;">
     <div class="modal-window ig-modal-window">
       <div class="modal-header ig-modal-header">
         <div class="modal-title-group">
           <h2 class="modal-title">📸 Instagram Auto-Publishing Connect</h2>
           <span class="modal-subtitle">Directly publish news memes and 9:16 vertical reels to your Instagram feed</span>
         </div>
-        <button id="closeInstagramBtn" class="modal-close-btn" onclick="closeInstagramModal()">✕</button>
+        <button id="closeInstagramBtn" class="modal-close-btn" title="Close Instagram" onclick="closeInstagramModal()">✕</button>
       </div>
 
       <div class="modal-body ig-modal-body">
@@ -622,14 +622,14 @@
   </div>
 
   <!-- INSTAGRAM SHARE & PUBLISH MODAL -->
-  <div class="modal-backdrop" id="igPublishModal" style="display: none;">
+  <div class="modal-backdrop is-hidden" id="igPublishModal" style="display: none !important;">
     <div class="modal-window ig-publish-window">
       <div class="modal-header ig-modal-header">
         <div class="modal-title-group">
           <h2 class="modal-title">🚀 Post Directly to Instagram</h2>
           <span class="modal-subtitle" id="igPublishSubtitle">Publish your meme to your Instagram feed</span>
         </div>
-        <button id="closeIgPublishBtn" class="modal-close-btn" onclick="closeIgPublishModal()">✕</button>
+        <button id="closeIgPublishBtn" class="modal-close-btn" title="Close Publishing" onclick="closeIgPublishModal()">✕</button>
       </div>
 
       <div class="modal-body ig-publish-body">
@@ -716,6 +716,6 @@
   <!-- Toast Container -->
   <div class="toast-container" id="toastContainer"></div>
 
-  <script src="app.js?v=9.0"></script>
+  <script src="app.js?v=11.0"></script>
 </body>
 </html>
