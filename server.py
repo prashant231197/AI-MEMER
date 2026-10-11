@@ -10,7 +10,27 @@ import warnings
 import hashlib
 import requests
 from bs4 import BeautifulSoup, XMLParsedAsHTMLWarning
-from googlenewsdecoder import gnewsdecoder
+# Compatibility shim for selectolax >= 1.0 (where modest backend was removed)
+try:
+    import selectolax
+    try:
+        from selectolax.parser import HTMLParser
+    except (ImportError, AttributeError):
+        from selectolax.lexbor import LexborHTMLParser
+        import types
+        _mod = types.ModuleType("selectolax.parser")
+        _mod.HTMLParser = LexborHTMLParser
+        sys.modules["selectolax.parser"] = _mod
+except Exception:
+    pass
+
+try:
+    from googlenewsdecoder import gnewsdecoder
+except Exception as _dec_err:
+    print(f"[DECODER] Note: gnewsdecoder not loaded ({_dec_err}). Using direct URL fallback.")
+    def gnewsdecoder(url):
+        return {"success": False, "decoded_url": url}
+
 import base64
 import io
 import subprocess
