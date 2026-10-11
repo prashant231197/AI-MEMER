@@ -228,6 +228,7 @@ const reelCtx = elements.reelCanvas ? elements.reelCanvas.getContext('2d') : nul
 function init() {
   updateVaultCount();
   setupEventListeners();
+  setMobileViewMode('feed');
   loadNewsFeed();
   checkInstagramStatus();
 }
