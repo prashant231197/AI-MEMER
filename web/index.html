@@ -1,0 +1,677 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI MEMER - Today's Live News & Meme Studio</title>
+  <meta name="description" content="Turn today's live breaking news feeds into viral memes with AI punchlines and an interactive Meme Studio.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800;900&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css?v=6.0">
+</head>
+<body>
+  <!-- Ambient background glow elements -->
+  <div class="glow-sphere glow-1"></div>
+  <div class="glow-sphere glow-2"></div>
+  <div class="glow-sphere glow-3"></div>
+
+  <!-- Main Container -->
+  <div class="app-layout">
+    <!-- Top Navigation Header -->
+    <header class="app-header" id="mainHeader">
+      <div class="header-left">
+        <div class="brand-logo" id="brandLogo">
+          <div class="logo-icon">⚡</div>
+          <div class="logo-text">
+            <span class="logo-title">AI MEMER</span>
+            <span class="logo-subtitle">PyGNews Live Feed & Studio</span>
+          </div>
+        </div>
+        <div class="live-pill" id="livePill">
+          <span class="pulse-dot"></span>
+          <span>LIVE FEEDS</span>
+        </div>
+      </div>
+
+      <div class="header-controls">
+        <div class="control-group">
+          <label for="countrySelect" class="control-label">Country:</label>
+          <select id="countrySelect" class="styled-select">
+            <option value="US" selected>🇺🇸 United States</option>
+            <option value="IN">🇮🇳 India</option>
+            <option value="GB">🇬🇧 United Kingdom</option>
+            <option value="CA">🇨🇦 Canada</option>
+            <option value="AU">🇦🇺 Australia</option>
+            <option value="DE">🇩🇪 Germany</option>
+            <option value="FR">🇫🇷 France</option>
+            <option value="JP">🇯🇵 Japan</option>
+          </select>
+        </div>
+
+        <button id="openReelStudioNavBtn" class="sparkle-btn" onclick="openReelStudio()" title="Create 9:16 Video Reel Meme">
+          <span class="btn-icon">🎬</span>
+          <span>Reel Maker Studio</span>
+        </button>
+
+        <button id="openInstagramModalBtn" class="ig-nav-btn" onclick="openInstagramModal()" title="Connect Instagram Account">
+          <span class="ig-nav-icon">📸</span>
+          <span id="igNavLabel">Connect Instagram</span>
+          <span id="igNavStatusDot" class="ig-nav-dot disconnected"></span>
+        </button>
+
+        <button id="openVaultBtn" class="secondary-btn" title="View Saved Memes">
+          <span class="btn-icon">📁</span>
+          <span>Meme Vault (<span id="vaultCount">0</span>)</span>
+        </button>
+
+        <button id="refreshFeedBtn" class="primary-btn" title="Refresh Live News">
+          <span class="btn-icon">🔄</span>
+          <span>Refresh</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- Hero / Category Strip -->
+    <nav class="nav-strip" id="navStrip">
+      <div class="topic-tabs" id="topicTabs">
+        <button class="tab-btn active" data-type="top" id="tabTop">🔥 Top Stories</button>
+        <button class="tab-btn" data-type="topic" data-topic="TECHNOLOGY" id="tabTech">⚡ Tech</button>
+        <button class="tab-btn" data-type="topic" data-topic="BUSINESS" id="tabBiz">💼 Business</button>
+        <button class="tab-btn" data-type="topic" data-topic="ENTERTAINMENT" id="tabEnt">🍿 Entertainment</button>
+        <button class="tab-btn" data-type="topic" data-topic="SPORTS" id="tabSports">⚽ Sports</button>
+        <button class="tab-btn" data-type="topic" data-topic="WORLD" id="tabWorld">🌐 World</button>
+        <button class="tab-btn" data-type="topic" data-topic="SCIENCE" id="tabSci">🔬 Science</button>
+        <button class="tab-btn" data-type="topic" data-topic="HEALTH" id="tabHealth">🏥 Health</button>
+      </div>
+
+      <!-- Search Bar -->
+      <div class="search-box-wrapper">
+        <span class="search-icon">🔍</span>
+        <input type="text" id="searchInput" class="search-input" placeholder="Search any topic (e.g. AI, NASA, Bitcoin)..." autocomplete="off">
+        <button id="searchClearBtn" class="search-clear-btn" style="display: none;">✕</button>
+      </div>
+    </nav>
+
+    <!-- Main Content Grid -->
+    <main class="content-container">
+      <!-- Left Column: News Feeds List -->
+      <section class="news-section" id="newsSection">
+        <div class="section-header">
+          <div class="section-title-wrap">
+            <h1 class="section-title" id="feedTitle">Today's Top Stories</h1>
+            <span class="feed-badge" id="feedCountBadge">Loading...</span>
+          </div>
+          <div class="filter-tools">
+            <input type="text" id="quickFilterInput" class="filter-input" placeholder="Filter articles...">
+          </div>
+        </div>
+
+        <!-- News Feed Cards Container -->
+        <div class="news-grid" id="newsGrid">
+          <!-- Dynamically populated news cards -->
+          <div class="loading-state">
+            <div class="spinner"></div>
+            <p>Fetching real-time Google News feeds via PyGNews...</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Right Column: Quick Meme Creator Dock -->
+      <aside class="studio-sidebar" id="studioSidebar">
+        <div class="sidebar-card">
+          <div class="sidebar-header">
+            <div class="sidebar-title">
+              <span class="spark-icon">✨</span>
+              <span>AI Meme Studio</span>
+            </div>
+            <span class="mini-tag">REAL-TIME</span>
+          </div>
+
+          <div class="quick-intro" id="quickIntro">
+            <p>Select any headline from the news feed or click <strong>"Meme This"</strong> to forge an instant viral meme!</p>
+          </div>
+
+          <!-- Active Headline preview -->
+          <div class="active-headline-box" id="activeHeadlineBox">
+            <div class="active-badge" id="activeHeadlineCategory">SELECTED HEADLINE</div>
+            <h3 class="active-title" id="activeHeadlineText">No headline selected yet. Pick a story from the left feed!</h3>
+            <div class="active-meta" id="activeHeadlineSource">Source: —</div>
+          </div>
+
+          <!-- Quick Action Buttons -->
+          <div class="sidebar-actions">
+            <button id="createReelSidebarBtn" class="sparkle-btn" onclick="openReelStudio()">
+              <span>🎬 Create 9:16 Video Reel</span>
+            </button>
+            <button id="memeWithPhotoBtn" class="primary-btn" disabled>
+              <span>📸 Meme With News Photo</span>
+            </button>
+            <button id="launchFullStudioBtn" class="accent-btn" disabled>
+              <span>🎨 Open Meme Studio Editor</span>
+            </button>
+            <button id="generateQuickMemeBtn" class="secondary-btn" disabled>
+              <span>🤖 Instant AI Punchlines</span>
+            </button>
+          </div>
+
+          <!-- Hot News Ticker -->
+          <div class="ticker-box">
+            <div class="ticker-label">🔥 TRENDING HOOKS</div>
+            <div class="ticker-items" id="tickerItems">
+              <div class="ticker-item">Click any news item to extract punchlines</div>
+            </div>
+          </div>
+        </div>
+      </aside>
+    </main>
+  </div>
+
+  <!-- FULL MEME STUDIO MODAL -->
+  <div class="modal-backdrop" id="studioModal" style="display: none;">
+    <div class="modal-window">
+      <div class="modal-header">
+        <div class="modal-title-group">
+          <h2 class="modal-title">🎨 Meme Studio & AI Punchline Lab</h2>
+          <span class="modal-subtitle">Turn today's news into viral graphic memes</span>
+        </div>
+        <button id="closeStudioBtn" class="modal-close-btn" title="Close Studio">✕</button>
+      </div>
+
+      <div class="modal-body">
+        <!-- Canvas Preview Area -->
+        <div class="canvas-panel">
+          <div class="canvas-wrapper" id="canvasWrapper">
+            <canvas id="memeCanvas" width="800" height="800"></canvas>
+          </div>
+          <div class="canvas-actions">
+            <button id="downloadMemeBtn" class="primary-btn">
+              <span>📥 Download</span>
+            </button>
+            <button id="openMemeIgPublishBtn" class="ig-share-btn" title="Post this Meme directly to Instagram">
+              <span>📸 Post to Instagram</span>
+            </button>
+            <button id="copyMemeBtn" class="secondary-btn">
+              <span>📋 Copy</span>
+            </button>
+            <button id="saveVaultBtn" class="secondary-btn">
+              <span>⭐ Vault</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Studio Control Sidebar -->
+        <div class="editor-controls">
+          <!-- Template selector -->
+          <div class="editor-section">
+            <label class="section-label">Select Meme Format:</label>
+            <div class="template-selector" id="templateSelector">
+              <button class="template-btn active" data-template="news_photo">
+                <span class="tpl-icon">📸</span>
+                <span class="tpl-name">News Photo Meme</span>
+              </button>
+              <button class="template-btn" data-template="breaking_news">
+                <span class="tpl-icon">📺</span>
+                <span class="tpl-name">Breaking News</span>
+              </button>
+              <button class="template-btn" data-template="twitter_card">
+                <span class="tpl-icon">🐦</span>
+                <span class="tpl-name">Viral Social Post</span>
+              </button>
+              <button class="template-btn" data-template="classic_impact">
+                <span class="tpl-icon">🖼️</span>
+                <span class="tpl-name">Classic Impact</span>
+              </button>
+              <button class="template-btn" data-template="two_buttons">
+                <span class="tpl-icon">🔘</span>
+                <span class="tpl-name">Two Buttons</span>
+              </button>
+              <button class="template-btn" data-template="this_is_fine">
+                <span class="tpl-icon">🔥</span>
+                <span class="tpl-name">This Is Fine</span>
+              </button>
+              <button class="template-btn" data-template="drake_style">
+                <span class="tpl-icon">✋</span>
+                <span class="tpl-name">Drake Approval</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- News Image Settings (Active when news_photo template is selected) -->
+          <div class="editor-section" id="newsPhotoSection">
+            <div class="section-label-row">
+              <label class="section-label">📸 News Photo Options:</label>
+              <span class="photo-status-badge" id="photoStatusBadge">Loading Photo...</span>
+            </div>
+
+            <!-- Photo Layout Modes -->
+            <div class="photo-layout-grid" id="photoLayoutGrid">
+              <button class="layout-btn active" data-substyle="photo_impact" title="Top & Bottom impact text over photo">
+                <span>💥 Impact Overlay</span>
+              </button>
+              <button class="layout-btn" data-substyle="photo_caption" title="White header text box with photo below">
+                <span>💬 Header Box (Reddit)</span>
+              </button>
+              <button class="layout-btn" data-substyle="photo_breaking" title="Live TV Breaking News bar over photo">
+                <span>📺 Breaking TV Bar</span>
+              </button>
+              <button class="layout-btn" data-substyle="photo_cinematic" title="Cinematic letterbox with subtitle text">
+                <span>🎬 Movie Subtitle</span>
+              </button>
+            </div>
+
+            <!-- Image Source Controls -->
+            <div class="image-source-tools">
+              <button id="reFetchImageBtn" class="small-tool-btn" title="Refetch article photo from source">
+                <span>🔄 Refetch Photo</span>
+              </button>
+              <label class="small-tool-btn upload-label" title="Upload screenshot or custom image">
+                <span>📁 Upload Image</span>
+                <input type="file" id="customImageInput" accept="image/*" style="display: none;">
+              </label>
+              <button id="pasteUrlBtn" class="small-tool-btn" title="Paste direct image link">
+                <span>🔗 Paste URL</span>
+              </button>
+            </div>
+
+            <!-- Image Darken Overlay Slider -->
+            <div class="overlay-slider-row">
+              <label for="darkenSlider" class="mini-label">Photo Dimming (Text Contrast): <span id="darkenVal">20</span>%</label>
+              <input type="range" id="darkenSlider" min="0" max="75" value="20" class="slider-input">
+            </div>
+          </div>
+
+          <!-- AI Punchline Suggestions -->
+          <div class="editor-section">
+            <div class="section-label-row">
+              <label class="section-label">⚡ Groq AI Dark & Deep Punchlines:</label>
+              <button id="regenerateAiBtn" class="text-link-btn">Regenerate</button>
+            </div>
+            <!-- Vibe selectors -->
+            <div class="ai-vibe-pill-group" id="aiVibePills" style="display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px;">
+              <button type="button" class="ai-vibe-pill active" data-vibe="dark">💀 Dark Irony</button>
+              <button type="button" class="ai-vibe-pill" data-vibe="deep">🧠 Deep Meme Think</button>
+              <button type="button" class="ai-vibe-pill" data-vibe="savage">🔥 Savage Viral</button>
+              <button type="button" class="ai-vibe-pill" data-vibe="apocalyptic">🖤 Apocalyptic Sarcasm</button>
+            </div>
+            <div class="ai-suggestions-list" id="aiSuggestionsList">
+              <div class="ai-suggest-placeholder">Select a headline to generate contextual comedy takes.</div>
+            </div>
+          </div>
+
+          <!-- Custom Text Inputs -->
+          <div class="editor-section">
+            <label class="section-label">Customize Text:</label>
+            <div class="form-group">
+              <label for="topTextInput" class="form-label">Top Banner / Lead Text:</label>
+              <input type="text" id="topTextInput" class="form-input" placeholder="e.g. BREAKING NEWS or Nobody:">
+            </div>
+            <div class="form-group">
+              <label for="bottomTextInput" class="form-label">Bottom Punchline / Headline:</label>
+              <textarea id="bottomTextInput" class="form-textarea" rows="3" placeholder="Punchline or main comedic text"></textarea>
+            </div>
+          </div>
+
+          <!-- Style Options -->
+          <div class="editor-section">
+            <label class="section-label">Styling Controls:</label>
+            <div class="style-row">
+              <div class="style-col">
+                <label for="textColorPicker" class="mini-label">Text Color</label>
+                <input type="color" id="textColorPicker" value="#ffffff" class="color-picker">
+              </div>
+              <div class="style-col">
+                <label for="strokeColorPicker" class="mini-label">Outline Color</label>
+                <input type="color" id="strokeColorPicker" value="#000000" class="color-picker">
+              </div>
+              <div class="style-col">
+                <label for="fontSizeSlider" class="mini-label">Font Size (<span id="fontSizeVal">36</span>px)</label>
+                <input type="range" id="fontSizeSlider" min="20" max="64" value="36" class="slider-input">
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- REEL MAKER STUDIO MODAL (9:16 VERTICAL VIDEO) -->
+  <div class="modal-backdrop" id="reelModal" style="display: none;">
+    <div class="modal-window reel-window">
+      <div class="modal-header">
+        <div class="modal-title-group">
+          <h2 class="modal-title">🎬 AI Reel Studio & Video Meme Creator</h2>
+          <span class="modal-subtitle">Create viral 9:16 vertical reels for Instagram, Shorts & TikTok</span>
+        </div>
+        <button id="closeReelBtn" class="modal-close-btn" title="Close Reel Studio">✕</button>
+      </div>
+
+      <div class="modal-body reel-body">
+        <!-- Left: 9:16 Smartphone Mockup Preview -->
+        <div class="reel-preview-panel">
+          <div class="phone-chassis">
+            <div class="phone-notch"></div>
+            <div class="phone-screen">
+              <canvas id="reelCanvas" width="720" height="1280"></canvas>
+              <!-- Hidden source video element -->
+              <video id="reelVideoSource" playsinline loop crossorigin="anonymous" src="/api/serve-video?name=sample_reel.mp4" style="display: none;"></video>
+              
+              <!-- Video Player Overlay Controls -->
+              <div class="video-overlay-bar">
+                <button id="togglePlayBtn" class="video-ctrl-btn" title="Play/Pause">▶️</button>
+                <input type="range" id="videoSeekBar" class="video-seek" min="0" max="100" value="0">
+                <button id="toggleMuteBtn" class="video-ctrl-btn" title="Mute/Unmute">🔊</button>
+                <span id="videoTimeDisplay" class="video-time">0:00</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="reel-export-actions">
+            <button id="exportReelBtn" class="sparkle-btn export-btn">
+              <span>🎬 Export Reel (MP4)</span>
+            </button>
+            <button id="openReelIgPublishBtn" class="ig-share-btn" title="Post this 9:16 Reel directly to Instagram">
+              <span>📸 Post to Instagram</span>
+            </button>
+            <button id="saveReelVaultBtn" class="secondary-btn">
+              <span>⭐ Save Reel</span>
+            </button>
+          </div>
+          <div id="exportProgressBar" class="export-progress" style="display: none;">
+            <div class="progress-fill" id="exportProgressFill"></div>
+            <span class="progress-text" id="exportProgressText">Rendering Reel: 0%</span>
+          </div>
+        </div>
+
+        <!-- Right: Reel Studio Controls -->
+        <div class="editor-controls reel-controls-scroll">
+          
+          <!-- 1. Video Source Chooser -->
+          <div class="editor-section">
+            <label class="section-label">1. Choose Video Source:</label>
+            <div class="video-tab-headers" id="videoSourceTabs">
+              <button class="vtab-btn active" data-vtab="paste">🔗 Paste URL</button>
+              <button class="vtab-btn" data-vtab="upload">📁 Upload Video</button>
+              <button class="vtab-btn" data-vtab="autosearch">✨ Auto-Fetch</button>
+              <button class="vtab-btn" data-vtab="preset">⚡ Presets</button>
+            </div>
+
+            <!-- Tab 1: Paste URL -->
+            <div class="vtab-content active" id="vtabPaste">
+              <p class="vtab-help">Paste Instagram Reel, YouTube Shorts, TikTok, or direct MP4 link:</p>
+              <div class="url-input-group">
+                <input type="text" id="reelUrlInput" class="form-input" placeholder="https://www.instagram.com/reel/... or https://youtube.com/shorts/...">
+                <button id="fetchReelUrlBtn" class="primary-btn">Fetch Video</button>
+              </div>
+            </div>
+
+            <!-- Tab 2: Upload Video -->
+            <div class="vtab-content" id="vtabUpload" style="display: none;">
+              <p class="vtab-help">Select any local video file (MP4, WebM, MOV):</p>
+              <label class="upload-dropzone">
+                <span class="dropzone-icon">📁</span>
+                <span class="dropzone-text">Click to choose or drag video here</span>
+                <input type="file" id="reelVideoFileInput" accept="video/mp4,video/webm,video/quicktime" style="display: none;">
+              </label>
+            </div>
+
+            <!-- Tab 3: Auto-Search Internet Video -->
+            <div class="vtab-content" id="vtabAutoSearch" style="display: none;">
+              <p class="vtab-help">Search related video footage for this news story:</p>
+              <div class="url-input-group">
+                <input type="text" id="autoSearchQueryInput" class="form-input" placeholder="News topic or headline...">
+                <button id="autoSearchVideoBtn" class="accent-btn">Search Internet</button>
+              </div>
+            </div>
+
+            <!-- Tab 4: Viral Presets -->
+            <div class="vtab-content" id="vtabPreset" style="display: none;">
+              <div class="preset-video-grid">
+                <button class="preset-vid-btn active" data-preset="sample_reel.mp4">
+                  <span>📺 Breaking Studio Loop</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Video Load Status Badge -->
+            <div class="video-status-indicator" id="videoStatusIndicator">
+              <span class="vstatus-dot"></span>
+              <span id="videoStatusLabel">Ready to play</span>
+            </div>
+          </div>
+
+          <!-- 2. Reel Layout Style -->
+          <div class="editor-section">
+            <label class="section-label">2. Select Reel Format (9:16):</label>
+            <div class="photo-layout-grid" id="reelLayoutGrid">
+              <button class="layout-btn active" data-reellayout="reel_split" title="White news card on top, video below - Most viral format!">
+                <span>📰 Split-Screen News Card</span>
+              </button>
+              <button class="layout-btn" data-reellayout="reel_chyron" title="Live TV Breaking News lower-third banner over video">
+                <span>📺 Breaking TV Chyron</span>
+              </button>
+              <button class="layout-btn" data-reellayout="reel_glass_card" title="Transparent floating POV card">
+                <span>💬 POV Floating Glass</span>
+              </button>
+              <button class="layout-btn" data-reellayout="reel_impact" title="Top & Bottom bold text">
+                <span>💥 Impact Text Overlay</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- 3. Viral Hooks & Captions -->
+          <div class="editor-section">
+            <div class="section-label-row">
+              <label class="section-label">3. ⚡ Groq AI Viral Reel Hooks:</label>
+              <button id="regenReelHooksBtn" class="text-link-btn">Regenerate</button>
+            </div>
+            <!-- Vibe selectors for Reels -->
+            <div class="ai-vibe-pill-group" id="reelVibePills" style="display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px;">
+              <button type="button" class="ai-vibe-pill active" data-vibe="dark">💀 Dark Deep Think</button>
+              <button type="button" class="ai-vibe-pill" data-vibe="savage">🔥 Savage POV</button>
+              <button type="button" class="ai-vibe-pill" data-vibe="ironic">📺 News Satire</button>
+              <button type="button" class="ai-vibe-pill" data-vibe="existential">🖤 Existential Dread</button>
+            </div>
+            <div class="ai-suggestions-list" id="reelHooksList">
+              <div class="ai-suggest-placeholder">Select headline to generate viral Reel hooks.</div>
+            </div>
+          </div>
+
+          <!-- 4. Text Customization -->
+          <div class="editor-section">
+            <label class="section-label">4. Customize Reel Content:</label>
+            <div class="form-group">
+              <label for="reelTopHookInput" class="form-label">Top Hook / Lead Title:</label>
+              <input type="text" id="reelTopHookInput" class="form-input" placeholder="e.g. POV: YOU CHECK THE NEWS TODAY 💀">
+            </div>
+            <div class="form-group">
+              <label for="reelCaptionInput" class="form-label">Main Punchline / Headline Caption:</label>
+              <textarea id="reelCaptionInput" class="form-textarea" rows="3" placeholder="Headline or viral commentary..."></textarea>
+            </div>
+            <div class="overlay-slider-row">
+              <label for="reelDarkenSlider" class="mini-label">Video Dimming: <span id="reelDarkenVal">15</span>%</label>
+              <input type="range" id="reelDarkenSlider" min="0" max="70" value="15" class="slider-input">
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SAVED MEMES VAULT MODAL -->
+  <div class="modal-backdrop" id="vaultModal" style="display: none;">
+    <div class="modal-window vault-window">
+      <div class="modal-header">
+        <div class="modal-title-group">
+          <h2 class="modal-title">📁 Your Saved Meme Vault</h2>
+          <span class="modal-subtitle">Locally preserved memes created from today's news</span>
+        </div>
+        <button id="closeVaultBtn" class="modal-close-btn">✕</button>
+      </div>
+      <div class="modal-body vault-body">
+        <div class="vault-grid" id="vaultGrid">
+          <!-- Populated dynamically -->
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- INSTAGRAM ACCOUNT CONNECTION MODAL -->
+  <div class="modal-backdrop" id="instagramModal" style="display: none;">
+    <div class="modal-window ig-modal-window">
+      <div class="modal-header ig-modal-header">
+        <div class="modal-title-group">
+          <h2 class="modal-title">📸 Instagram Auto-Publishing Connect</h2>
+          <span class="modal-subtitle">Directly publish news memes and 9:16 vertical reels to your Instagram feed</span>
+        </div>
+        <button id="closeInstagramBtn" class="modal-close-btn" onclick="closeInstagramModal()">✕</button>
+      </div>
+
+      <div class="modal-body ig-modal-body">
+        <!-- Connected Account View -->
+        <div id="igConnectedView" class="ig-card-connected" style="display: none;">
+          <div class="ig-profile-badge">
+            <img id="igProfilePic" src="" alt="Profile" class="ig-avatar">
+            <div class="ig-user-details">
+              <div class="ig-username-row">
+                <span id="igUsernameDisplay" class="ig-user-handle">@username</span>
+                <span class="ig-active-pill">🟢 Connected</span>
+              </div>
+              <div id="igFullNameDisplay" class="ig-user-name">Full Name</div>
+              <div class="ig-stats-row">
+                <span id="igFollowersCount" class="ig-stat">0 Followers</span>
+              </div>
+            </div>
+          </div>
+          <p class="ig-ready-notice">✨ Your Instagram account is connected! You can now post memes and reels directly with 1 click.</p>
+          <div class="ig-connected-actions">
+            <button id="igDisconnectBtn" class="secondary-btn danger-btn">Disconnect Account</button>
+          </div>
+        </div>
+
+        <!-- Disconnected Login / Session Cookie View -->
+        <div id="igDisconnectedView" class="ig-card-disconnected">
+          <div class="ig-tabs">
+            <button class="ig-tab-btn active" data-igtab="session">🔗 Session ID (Fastest - No Password)</button>
+            <button class="ig-tab-btn" data-igtab="creds">🔑 Username & Password</button>
+          </div>
+
+          <!-- Tab 1: Session ID -->
+          <div id="igTabSession" class="ig-tab-pane active">
+            <div class="ig-helper-box">
+              <div class="ig-helper-title">💡 How to copy your Session ID (since you're already logged in):</div>
+              <ol class="ig-helper-steps">
+                <li>Open <strong>instagram.com</strong> in your browser (where you are logged in).</li>
+                <li>Press <strong>F12</strong> (or right-click anywhere &gt; <em>Inspect</em>).</li>
+                <li>Go to <strong>Application</strong> tab (in Firefox: <em>Storage</em>) &gt; <strong>Cookies</strong> &gt; <code>https://www.instagram.com</code>.</li>
+                <li>Find <code>sessionid</code>, double-click its value, copy and paste below:</li>
+              </ol>
+            </div>
+
+            <div class="form-group">
+              <label for="igSessionIdInput" class="form-label">Instagram Session ID Cookie:</label>
+              <input type="password" id="igSessionIdInput" class="form-input" placeholder="Paste sessionid cookie here...">
+            </div>
+            <button id="igConnectSessionBtn" class="ig-primary-connect-btn">
+              <span>🚀 Connect Instagram Account</span>
+            </button>
+          </div>
+
+          <!-- Tab 2: Username & Password -->
+          <div id="igTabCreds" class="ig-tab-pane" style="display: none;">
+            <div class="form-group">
+              <label for="igUsernameInput" class="form-label">Instagram Username / Email:</label>
+              <input type="text" id="igUsernameInput" class="form-input" placeholder="e.g. memer_official">
+            </div>
+            <div class="form-group">
+              <label for="igPasswordInput" class="form-label">Instagram Password:</label>
+              <input type="password" id="igPasswordInput" class="form-input" placeholder="Your Instagram password">
+            </div>
+            <div class="form-group">
+              <label for="ig2faInput" class="form-label">2FA Code (Optional - if 2-factor is enabled):</label>
+              <input type="text" id="ig2faInput" class="form-input" placeholder="6-digit authentication code">
+            </div>
+            <button id="igConnectCredsBtn" class="ig-primary-connect-btn">
+              <span>🔑 Login & Connect Account</span>
+            </button>
+          </div>
+        </div>
+
+        <div id="igStatusMsg" class="ig-status-msg" style="display: none;"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- INSTAGRAM SHARE & PUBLISH MODAL -->
+  <div class="modal-backdrop" id="igPublishModal" style="display: none;">
+    <div class="modal-window ig-publish-window">
+      <div class="modal-header ig-modal-header">
+        <div class="modal-title-group">
+          <h2 class="modal-title">🚀 Post Directly to Instagram</h2>
+          <span class="modal-subtitle" id="igPublishSubtitle">Publish your meme to your Instagram feed</span>
+        </div>
+        <button id="closeIgPublishBtn" class="modal-close-btn" onclick="closeIgPublishModal()">✕</button>
+      </div>
+
+      <div class="modal-body ig-publish-body">
+        <div class="ig-publish-preview-panel">
+          <div class="ig-media-preview-box">
+            <img id="igPublishImgPreview" src="" alt="Meme Preview" style="display: none;">
+            <video id="igPublishVidPreview" controls loop playsinline style="display: none;"></video>
+          </div>
+          <div class="ig-upload-custom-file-row" id="igCustomUploadRow" style="margin-top: 10px; text-align: center;">
+            <label class="text-link-btn" style="cursor: pointer; font-size: 13px; color: #38bdf8; text-decoration: underline;">
+              📁 Or pick an exported Reel MP4 from your PC
+              <input type="file" id="igCustomVideoInput" accept="video/mp4,video/webm" style="display: none;">
+            </label>
+          </div>
+        </div>
+
+        <div class="ig-publish-form-panel">
+          <div class="form-group">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+              <label for="igCaptionTextarea" class="form-label" style="margin: 0;">Post Caption & Punchline:</label>
+              <button type="button" id="igAiGenCaptionBtn" class="text-link-btn" style="color: #a855f7; font-weight: 600; font-size: 12px; display: inline-flex; align-items: center; gap: 4px; background: rgba(168, 85, 247, 0.12); padding: 3px 8px; border-radius: 6px; border: 1px solid rgba(168, 85, 247, 0.35); cursor: pointer;">
+                ✨ Groq AI Viral Caption
+              </button>
+            </div>
+            <textarea id="igCaptionTextarea" class="form-textarea" rows="4" placeholder="Caption..."></textarea>
+          </div>
+
+          <div class="form-group">
+            <label for="igHashtagsInput" class="form-label">Viral Hashtags:</label>
+            <input type="text" id="igHashtagsInput" class="form-input" value="#memes #dailynews #trending #aimemer #news #viral">
+          </div>
+
+          <div class="ig-quick-hashtags" id="igHashtagPills">
+            <span class="ig-tag-pill" data-tag="#funny">#funny</span>
+            <span class="ig-tag-pill" data-tag="#breakingnews">#breakingnews</span>
+            <span class="ig-tag-pill" data-tag="#relatable">#relatable</span>
+            <span class="ig-tag-pill" data-tag="#explorepage">#explorepage</span>
+            <span class="ig-tag-pill" data-tag="#reelsindia">#reelsindia</span>
+          </div>
+
+          <div class="ig-publish-actions">
+            <button id="confirmPublishIgBtn" class="ig-primary-connect-btn">
+              <span>🚀 Share to Instagram Now</span>
+            </button>
+          </div>
+
+          <div id="igPublishProgressBox" class="ig-publish-progress-box" style="display: none;">
+            <div class="spinner"></div>
+            <span id="igPublishProgressText">Publishing to Instagram...</span>
+          </div>
+
+          <div id="igPublishResultBox" class="ig-publish-result" style="display: none;"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Container -->
+  <div class="toast-container" id="toastContainer"></div>
+
+  <script src="app.js?v=7.0"></script>
+</body>
+</html>
