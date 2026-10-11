@@ -167,6 +167,22 @@ const elements = {
   igPublishProgressText: document.getElementById('igPublishProgressText'),
   igPublishResultBox: document.getElementById('igPublishResultBox'),
   
+  // Mobile Navigation & View Elements
+  contentContainer: document.getElementById('contentContainer'),
+  mobileModeSwitcher: document.getElementById('mobileModeSwitcher'),
+  modeSwitchFeed: document.getElementById('modeSwitchFeed'),
+  modeSwitchStudio: document.getElementById('modeSwitchStudio'),
+  mModeBadge: document.getElementById('mModeBadge'),
+  mSelectedBadge: document.getElementById('mSelectedBadge'),
+  mobileBottomNav: document.getElementById('mobileBottomNav'),
+  mNavNews: document.getElementById('mNavNews'),
+  mNavStudio: document.getElementById('mNavStudio'),
+  mNavReel: document.getElementById('mNavReel'),
+  mNavIg: document.getElementById('mNavIg'),
+  mNavVault: document.getElementById('mNavVault'),
+  mIgNavDot: document.getElementById('mIgNavDot'),
+  mVaultCountBadge: document.getElementById('mVaultCountBadge'),
+  
   toastContainer: document.getElementById('toastContainer')
 };
 
@@ -430,6 +446,80 @@ function setupEventListeners() {
 
   // Instagram Connect & Publish Listeners
   setupInstagramEventListeners();
+
+  // Mobile Bottom Navigation & View Mode Listeners
+  setupMobileEventListeners();
+}
+
+function setupMobileEventListeners() {
+  // 1. Mobile Mode Switcher (Feed vs Studio Dock)
+  if (elements.modeSwitchFeed) {
+    elements.modeSwitchFeed.addEventListener('click', () => {
+      setMobileViewMode('feed');
+    });
+  }
+
+  if (elements.modeSwitchStudio) {
+    elements.modeSwitchStudio.addEventListener('click', () => {
+      setMobileViewMode('studio');
+    });
+  }
+
+  // 2. Mobile Bottom Navigation Dock Items
+  if (elements.mNavNews) {
+    elements.mNavNews.addEventListener('click', () => {
+      setMobileViewMode('feed');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    });
+  }
+
+  if (elements.mNavStudio) {
+    elements.mNavStudio.addEventListener('click', () => {
+      if (state.selectedArticle) {
+        openStudioModal();
+      } else {
+        setMobileViewMode('studio');
+        showToast('Select any news story from the feed to meme!', 'info');
+      }
+    });
+  }
+
+  if (elements.mNavReel) {
+    elements.mNavReel.addEventListener('click', () => {
+      openReelStudio(state.selectedArticle?.title || '');
+    });
+  }
+
+  if (elements.mNavIg) {
+    elements.mNavIg.addEventListener('click', () => {
+      openInstagramModal();
+    });
+  }
+
+  if (elements.mNavVault) {
+    elements.mNavVault.addEventListener('click', () => {
+      openVaultModal();
+    });
+  }
+}
+
+function setMobileViewMode(mode) {
+  if (!elements.contentContainer) return;
+  if (mode === 'feed') {
+    elements.contentContainer.classList.remove('show-studio-only');
+    elements.contentContainer.classList.add('show-feed-only');
+    if (elements.modeSwitchFeed) elements.modeSwitchFeed.classList.add('active');
+    if (elements.modeSwitchStudio) elements.modeSwitchStudio.classList.remove('active');
+    if (elements.mNavNews) elements.mNavNews.classList.add('active');
+    if (elements.mNavStudio) elements.mNavStudio.classList.remove('active');
+  } else {
+    elements.contentContainer.classList.remove('show-feed-only');
+    elements.contentContainer.classList.add('show-studio-only');
+    if (elements.modeSwitchStudio) elements.modeSwitchStudio.classList.add('active');
+    if (elements.modeSwitchFeed) elements.modeSwitchFeed.classList.remove('active');
+    if (elements.mNavStudio) elements.mNavStudio.classList.add('active');
+    if (elements.mNavNews) elements.mNavNews.classList.remove('active');
+  }
 }
 
 function updateTemplateSelectionUI() {
@@ -542,6 +632,9 @@ async function loadNewsFeed() {
     state.clusters = data.clusters || [];
     state.articles = data.articles || [];
     elements.feedCountBadge.textContent = `${state.clusters.length} Story Clusters`;
+    if (elements.mModeBadge) {
+      elements.mModeBadge.textContent = `${state.clusters.length}`;
+    }
 
     renderNewsCards();
     updateTrendingTicker();
@@ -671,6 +764,7 @@ function selectArticle(article, withPhoto = false) {
   elements.generateQuickMemeBtn.disabled = false;
   if (elements.createReelSidebarBtn) elements.createReelSidebarBtn.disabled = false;
   if (elements.autoSearchQueryInput) elements.autoSearchQueryInput.value = article.title;
+  if (elements.mSelectedBadge) elements.mSelectedBadge.textContent = 'Selected';
 
   state.memeData.topText = 'WHEN THE NEWS DROPS:';
   state.memeData.bottomText = article.title;
@@ -1413,7 +1507,9 @@ function closeVaultModal() {
 }
 
 function updateVaultCount() {
-  elements.vaultCount.textContent = state.savedVault.length;
+  const count = state.savedVault.length;
+  if (elements.vaultCount) elements.vaultCount.textContent = count;
+  if (elements.mVaultCountBadge) elements.mVaultCountBadge.textContent = count;
 }
 
 function renderVaultGrid() {
@@ -2485,6 +2581,9 @@ function updateInstagramUI() {
     if (elements.igNavStatusDot) {
       elements.igNavStatusDot.className = 'ig-nav-dot connected';
     }
+    if (elements.mIgNavDot) {
+      elements.mIgNavDot.className = 'm-nav-dot connected';
+    }
     if (elements.igConnectedView) elements.igConnectedView.style.display = 'block';
     if (elements.igDisconnectedView) elements.igDisconnectedView.style.display = 'none';
 
@@ -2504,6 +2603,9 @@ function updateInstagramUI() {
     if (elements.igNavLabel) elements.igNavLabel.textContent = 'Connect Instagram';
     if (elements.igNavStatusDot) {
       elements.igNavStatusDot.className = 'ig-nav-dot disconnected';
+    }
+    if (elements.mIgNavDot) {
+      elements.mIgNavDot.className = 'm-nav-dot disconnected';
     }
     if (elements.igConnectedView) elements.igConnectedView.style.display = 'none';
     if (elements.igDisconnectedView) elements.igDisconnectedView.style.display = 'block';
