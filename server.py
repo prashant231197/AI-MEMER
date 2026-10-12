@@ -235,38 +235,146 @@ def extract_article_image(article_url, title=""):
     return None
 
 
+def get_video_info(file_path):
+    """Probe video dimensions, duration, and quality with ffmpeg."""
+    info = {"width": 1080, "height": 1920, "quality": "1080p Full HD", "badge": "💎 1080p Full HD", "duration": 12.0}
+    if not file_path or not os.path.exists(file_path):
+        return info
+    try:
+        cmd = [FFMPEG_PATH, "-i", file_path]
+        res = subprocess.run(cmd, stderr=subprocess.PIPE, stdout=subprocess.PIPE, timeout=8)
+        stderr_text = res.stderr.decode("utf-8", errors="ignore")
+        match = re.search(r"Video:.*?, (\d{3,4})x(\d{3,4})", stderr_text)
+        if match:
+            w, h = int(match.group(1)), int(match.group(2))
+            info["width"] = w
+            info["height"] = h
+            min_dim = min(w, h)
+            max_dim = max(w, h)
+            if max_dim >= 1920 or min_dim >= 1080:
+                info["quality"] = "1080p Full HD"
+                info["badge"] = f"💎 {w}x{h} Full HD"
+            elif max_dim >= 1280 or min_dim >= 720:
+                info["quality"] = "720p HD"
+                info["badge"] = f"⚡ {w}x{h} Crisp HD"
+            else:
+                info["quality"] = f"{min_dim}p"
+                info["badge"] = f"🎬 {w}x{h}"
+        dur_match = re.search(r"Duration: (\d{2}):(\d{2}):(\d{2}\.\d+)", stderr_text)
+        if dur_match:
+            hrs, mins, secs = int(dur_match.group(1)), int(dur_match.group(2)), float(dur_match.group(3))
+            info["duration"] = round(hrs * 3600 + mins * 60 + secs, 1)
+    except Exception as e:
+        print(f"[PROBE] Note: {e}")
+    return info
+
+
+def ensure_h264_mp4(src_path):
+    """
+    Ensure the downloaded file is standard H.264 MP4 with faststart flags.
+    Converts webm/mkv or non-H264 video so HTML5 video element in Chrome/Edge streams smoothly.
+    """
+    if not src_path or not os.path.exists(src_path):
+        return src_path
+    
+    base, ext = os.path.splitext(src_path)
+    try:
+        cmd = [FFMPEG_PATH, "-i", src_path]
+        res = subprocess.run(cmd, stderr=subprocess.PIPE, stdout=subprocess.PIPE, timeout=8)
+        stderr_text = res.stderr.decode("utf-8", errors="ignore")
+        is_h264 = "Video: h264" in stderr_text
+        has_audio = "Audio:" in stderr_text
+
+        # If it's already mp4 and h264, it's ready
+        if ext.lower() == ".mp4" and is_h264:
+            return src_path
+
+        out_mp4 = base + "_hd.mp4"
+        convert_cmd = [
+            FFMPEG_PATH, "-y",
+            "-i", src_path,
+            "-c:v", "libx264",
+            "-pix_fmt", "yuv420p",
+            "-preset", "veryfast",
+            "-crf", "18",
+            "-movflags", "+faststart"
+        ]
+        if has_audio:
+            convert_cmd.extend(["-c:a", "aac", "-b:a", "192k"])
+        else:
+            convert_cmd.extend(["-f", "lavfi", "-i", "anullsrc=channel_layout=stereo:sample_rate=44100", "-c:a", "aac", "-b:a", "128k"])
+        
+        convert_cmd.append(out_mp4)
+        sub_res = subprocess.run(convert_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=60)
+        if sub_res.returncode == 0 and os.path.exists(out_mp4) and os.path.getsize(out_mp4) > 1000:
+            return out_mp4
+    except Exception as e:
+        print(f"[ENSURE_H264] Conversion note: {e}")
+    return src_path
+
+
 def fetch_or_search_video(source_input, is_search=False):
     """
-    Downloads or extracts video from an Instagram Reel, YouTube Shorts,
-    direct video URL, or searches the web for a related video clip.
+    Downloads highest-quality HD video from Instagram Reel, YouTube Shorts,
+    TikTok, Pinterest, direct MP4 link, or searches the web for HD video clips.
     """
     source_clean = source_input.strip()
     cache_key = f"{'search_' if is_search else 'url_'}{source_clean}"
     if cache_key in VIDEO_CACHE:
-        cached_file = VIDEO_CACHE[cache_key]
+        cached_info = VIDEO_CACHE[cache_key]
+        cached_file = cached_info.get("filename") if isinstance(cached_info, dict) else cached_info
         if os.path.exists(os.path.join(VIDEO_DIR, cached_file)):
-            return cached_file, f"Video: {source_clean[:40]}"
+            full_path = os.path.join(VIDEO_DIR, cached_file)
+            vid_info = get_video_info(full_path)
+            cached_title = cached_info.get("title", f"Video: {source_clean[:40]}") if isinstance(cached_info, dict) else f"Video: {source_clean[:40]}"
+            return cached_file, cached_title, vid_info
 
     file_id = hashlib.md5(source_clean.encode()).hexdigest()[:10]
     out_template = os.path.join(VIDEO_DIR, f"reel_{file_id}.%(ext)s")
 
     if is_search:
-        target_query = f"ytsearch1:{source_clean} news video 15 seconds"
+        target_query = f"ytsearch1:{source_clean} 4k hd reel 15 seconds"
     else:
         target_query = source_clean
 
+    # Fast high-definition video extraction options (Parallel & Optimized)
     ydl_opts = {
         "ffmpeg_location": FFMPEG_PATH,
-        "format": "bestvideo*+bestaudio/best",
+        # Prefer fast mp4 streams under 1080p, avoid massive multi-hundred-megabyte files
+        "format": "best[ext=mp4][height<=1080]/bestvideo[height<=1080]+bestaudio/best[height<=720]/best",
         "merge_output_format": "mp4",
         "outtmpl": out_template,
         "quiet": True,
         "no_warnings": True,
         "noplaylist": True,
-        "max_filesize": 40 * 1024 * 1024,
+        "socket_timeout": 12,
+        "concurrent_fragment_downloads": 4,
+        "max_filesize": 45 * 1024 * 1024,  # Cap at 45MB so large videos are not slowly downloaded
+        "http_headers": {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,video/*,*/*;q=0.8",
+            "Accept-Language": "en-US,en;q=0.9",
+        }
     }
 
     try:
+        # Check if direct Instagram Reel and instagrapi is connected
+        if ("instagram.com/reel/" in target_query or "instagram.com/p/" in target_query) and not is_search:
+            cl = get_instagram_client()
+            if cl:
+                try:
+                    print(f"[INSTAGRAM] Attempting high-quality reel download via session client...")
+                    media_pk = cl.media_pk_from_url(target_query)
+                    ig_path = cl.clip_download(media_pk, folder=VIDEO_DIR)
+                    if ig_path and os.path.exists(ig_path):
+                        final_fname = os.path.basename(ig_path)
+                        final_fname = os.path.basename(ensure_h264_mp4(os.path.join(VIDEO_DIR, final_fname)))
+                        v_info = get_video_info(os.path.join(VIDEO_DIR, final_fname))
+                        VIDEO_CACHE[cache_key] = {"filename": final_fname, "title": "Instagram Reel (HD)"}
+                        return final_fname, "Instagram Reel (HD)", v_info
+                except Exception as ig_err:
+                    print(f"[INSTAGRAM] instagrapi fallback note: {ig_err}")
+
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(target_query, download=True)
             if "entries" in info and info["entries"]:
@@ -275,20 +383,34 @@ def fetch_or_search_video(source_input, is_search=False):
             final_filename = f"reel_{file_id}.mp4"
             actual_path = os.path.join(VIDEO_DIR, final_filename)
             if not os.path.exists(actual_path):
-                # Look for matching downloaded file
-                for f in os.listdir(VIDEO_DIR):
-                    if f.startswith(f"reel_{file_id}"):
-                        final_filename = f
-                        break
+                # Search for matching downloaded files (e.g. .mp4, .webm, .mkv)
+                candidates = [f for f in os.listdir(VIDEO_DIR) if f.startswith(f"reel_{file_id}") and not f.endswith(".part")]
+                if candidates:
+                    candidates.sort(key=lambda x: (x.endswith(".mp4"), os.path.getsize(os.path.join(VIDEO_DIR, x))), reverse=True)
+                    actual_path = os.path.join(VIDEO_DIR, candidates[0])
+                    final_filename = candidates[0]
 
-            VIDEO_CACHE[cache_key] = final_filename
-            title = info.get("title", "Video Clip")
-            return final_filename, title
+            # Ensure H.264 MP4 encoding for 100% browser compatibility
+            ensured_path = ensure_h264_mp4(actual_path)
+            final_filename = os.path.basename(ensured_path)
+
+            v_info = get_video_info(ensured_path)
+            title = info.get("title", "HD Video Clip")
+            VIDEO_CACHE[cache_key] = {"filename": final_filename, "title": title}
+            return final_filename, title, v_info
+
     except Exception as e:
         print(f"[YT-DLP] Error downloading video for {source_clean[:40]}: {e}")
-        # If specific search fails, fallback to sample_reel.mp4 if present
+        # Clean up any partial files
+        for f in os.listdir(VIDEO_DIR):
+            if f.startswith(f"reel_{file_id}") and f.endswith(".part"):
+                try: os.remove(os.path.join(VIDEO_DIR, f))
+                except: pass
+
         if os.path.exists(os.path.join(VIDEO_DIR, "sample_reel.mp4")):
-            return "sample_reel.mp4", "News Background Motion Clip"
+            sample_path = os.path.join(VIDEO_DIR, "sample_reel.mp4")
+            v_info = get_video_info(sample_path)
+            return "sample_reel.mp4", "News Background Motion Clip", v_info
         raise
 
 
@@ -453,65 +575,500 @@ Respond ONLY with valid JSON in this exact structure:
     }
 
 
+# ==============================================================================
+# 20 VIRAL REEL PATTERNS & DATASET CATALOG (News, Dark Memes, Reddit & Collabs)
+# ==============================================================================
+VIRAL_REEL_DATASET = [
+    {
+        "id": "reel_split",
+        "name": "Split-Screen Breaking News Card",
+        "category": "news",
+        "theme": "Viral Breaking News / Headline Satire",
+        "location": "Global Broadcast Feed",
+        "pattern": "Top White Card → Breaking Badge → Punchline Lead → Motion Video Below",
+        "shot_type": "Split-screen dual view",
+        "pace": "Fast 8-12s loop",
+        "audio_style": "Trending viral audio / phonk / news boom",
+        "hook": "POV: YOU OPENED THE NEWS TODAY 💀",
+        "caption": "When reality is written by a chaotic writer and we are just background characters.",
+        "sub_badge": "WAIT TILL THE END 😭",
+        "frame_design": "Clean high-contrast white card top, gradient divider, bottom video",
+        "text_style": "Outfit 900 bold black & dark slate typography",
+        "color_grade": "clean_hd",
+        "quality_tip": "Crisp 1080p card text with pixel-perfect alignment (CRF 16)",
+        "viral_element": "Instant curiosity gap + high save and share velocity",
+        "icon": "📰"
+    },
+    {
+        "id": "reel_chyron",
+        "name": "Breaking TV Broadcast Chyron",
+        "category": "news",
+        "theme": "Live TV Broadcast Satire & Real-time Ticker",
+        "location": "Live News Studio",
+        "pattern": "🔴 LIVE Watermark → Red Lower-Third Bar → Breaking Banner → Animated Ticker",
+        "shot_type": "Full video with live broadcast lower-third graphics",
+        "pace": "Live broadcast flow 10-15s",
+        "audio_style": "News dramatic boom sound / synth tension",
+        "hook": "🔴 BREAKING: THE SIMULATION GLITCHED AGAIN",
+        "caption": "Scientists report reality is unraveling, more details at 11.",
+        "sub_badge": "HAPPENING RIGHT NOW 🚨",
+        "frame_design": "Red lower-third bar + navy container + scrolling bottom marquee ticker",
+        "text_style": "Impact & Outfit TV news bold typography",
+        "color_grade": "news_vivid",
+        "quality_tip": "Smooth 60fps ticker animation for realistic broadcast feel",
+        "viral_element": "Parody authority + instant stopping power on Instagram explore",
+        "icon": "📺"
+    },
+    {
+        "id": "reel_unusual_whales",
+        "name": "Market & Money Reality Satire",
+        "category": "news",
+        "theme": "Economic Truth & Savage Financial Satire",
+        "location": "Wall Street Midnight Desk",
+        "pattern": "Market Alert Pill → Dark Trading Card → Stock Ticker → Savage Reality Truth",
+        "shot_type": "Dark financial terminal card over video loop",
+        "pace": "Snappy 10-14s",
+        "audio_style": "Deep bass boom with vinyl crackle",
+        "hook": "BREAKING FINANCIAL UPDATE 📉",
+        "caption": "We went from flying car dreams to paying monthly rent for heated car seats in our own cars 💀",
+        "sub_badge": "MARKET DERAILMENT 💸",
+        "frame_design": "Bloomberg terminal dark mode card with neon green/red ticker alert",
+        "text_style": "Inter and monospace clean financial headline",
+        "color_grade": "dark_oled",
+        "quality_tip": "Keep card padding generous with high contrast text for readability",
+        "viral_element": "Massive relatability regarding inflation & modern cost of living",
+        "icon": "💸"
+    },
+    {
+        "id": "reel_fake_notification",
+        "name": "Shock Breaking Notification",
+        "category": "news",
+        "theme": "Urgent Push Notification Reality Check",
+        "location": "Smartphone Lock Screen",
+        "pattern": "Push Notification Popup → App Icon → Urgent Headline → Reality Reaction",
+        "shot_type": "Floating iOS / Android blur card interrupting video footage",
+        "pace": "Snappy 8-10s",
+        "audio_style": "iPhone notification ping + dramatic bass drop",
+        "hook": "URGENT SYSTEM NOTIFICATION 🔔",
+        "caption": "Your 30-day free trial of being a calm adult has expired. Please upgrade or panic.",
+        "sub_badge": "BREAKING ALERT 🚨",
+        "frame_design": "Frosted glass floating push notification card with app icon and timestamp",
+        "text_style": "San Francisco / Inter bold modern notification typography",
+        "color_grade": "clean_hd",
+        "quality_tip": "Instant 0.5s notification pop-in creates instant pause-scrolling",
+        "viral_element": "Mimics real phone notifications, triggering immediate human attention",
+        "icon": "🔔"
+    },
+    {
+        "id": "reel_headline_reaction",
+        "name": "Headline + Meme Reaction Collab",
+        "category": "news",
+        "theme": "Absurd News Headline + Shock Reaction",
+        "location": "Viral Reaction Studio",
+        "pattern": "Top Wild Headline Card → Dramatic Sound Cue → Bottom Absurd Reaction Video",
+        "shot_type": "Vertical dual split reaction",
+        "pace": "Punchy 6-9s quick loop",
+        "audio_style": "Dramatic vine boom / funny meme audio",
+        "hook": "THERE IS NO WAY THIS IS REAL 😭",
+        "caption": "Every morning the news writers wake up and choose pure unscripted chaos.",
+        "sub_badge": "WAIT FOR IT 💀",
+        "frame_design": "Headline banner top with glowing border and full reaction video bottom",
+        "text_style": "Outfit 900 bold black text on white header pill",
+        "color_grade": "news_vivid",
+        "quality_tip": "High contrast between top headline and bottom reaction clip",
+        "viral_element": "Instant meme recognition + punchy humour",
+        "icon": "🎭"
+    },
+    {
+        "id": "reel_dark_humor",
+        "name": "Existential Dark Meme",
+        "category": "meme",
+        "theme": "Dark Humor & Existential Dread",
+        "location": "Midnight Void",
+        "pattern": "Existential Setup → Dramatic Pause → Dark Truth Punchline → Relatable Despair",
+        "shot_type": "Dimmed background footage with high-contrast text overlay",
+        "pace": "Slow burn 8-12s loop",
+        "audio_style": "Slowed + reverb melancholic lo-fi",
+        "hook": "Smiling through the existential dread 🙂",
+        "caption": "Just another completely normal day on planet Earth where everything is totally fine.",
+        "sub_badge": "DARK HUMOR 💀",
+        "frame_design": "Dark vignette frame with glowing blood red and slate accents",
+        "text_style": "Outfit 900 stark white text with subtle drop shadow",
+        "color_grade": "dark_oled",
+        "quality_tip": "Deep black shadows with high dynamic range text highlights",
+        "viral_element": "Massive Gen-Z nihilistic relatability and meme comment threads",
+        "icon": "💀"
+    },
+    {
+        "id": "reel_impact",
+        "name": "Classic Savage Impact Meme",
+        "category": "meme",
+        "theme": "All-Caps Bold Savage Meme",
+        "location": "Front Page Meme Desk",
+        "pattern": "Giant Top Setup → High Energy Footage → Bottom Savage Punchline",
+        "shot_type": "Full video with giant stroked text",
+        "pace": "Fast 6-10s",
+        "audio_style": "High energy phonk / trending meme sound",
+        "hook": "ME TRYING TO FIX MY SLEEP SCHEDULE",
+        "caption": "3:00 AM THOUGHTS ABOUT THE ROMAN EMPIRE AND EXISTENCE 💀",
+        "sub_badge": "TOO RELATABLE 😭",
+        "frame_design": "No borders, giant classic Impact typography with 10px black outline",
+        "text_style": "Impact font, uppercase, pure white fill with heavy black stroke",
+        "color_grade": "clean_hd",
+        "quality_tip": "Crisp font rendering at native 1080p resolution",
+        "viral_element": "Instant readability on mobile feeds without having to click",
+        "icon": "💥"
+    },
+    {
+        "id": "reel_simulation_glitch",
+        "name": "Simulation Glitch Matrix",
+        "category": "meme",
+        "theme": "Sci-Fi Reality Glitch & Satire",
+        "location": "Matrix Server Room",
+        "pattern": "Matrix HUD → Glitch Scanlines → Absurd Event Breakdown → Simulation Reset",
+        "shot_type": "Glitch VHS style over bizarre real-world footage",
+        "pace": "Fast 8-12s",
+        "audio_style": "Cyberpunk darksynth / digital glitch sound",
+        "hook": "SIMULATION ERROR #404 ⚡",
+        "caption": "The developers of Earth haven't released a patch update since 2019 and it shows.",
+        "sub_badge": "GLITCH IN REALITY 👾",
+        "frame_design": "Neon cyan & green matrix HUD brackets with scanline overlay",
+        "text_style": "Monospace / Courier Prime bold tech typography with cyan glow",
+        "color_grade": "neon_cyber",
+        "quality_tip": "High-contrast neon glow falloff with sharp text edge",
+        "viral_element": "Very popular among Gen-Z and tech audience, high comment debate",
+        "icon": "👾"
+    },
+    {
+        "id": "reel_tweet_dark",
+        "name": "OLED Dark Mode Viral X Thread",
+        "category": "meme",
+        "theme": "Dark Mode Viral Tweet Commentary",
+        "location": "X (Twitter) Midnight Feed",
+        "pattern": "Profile Badge → Verified Check → Tweet Punchline → Views Counter",
+        "shot_type": "Clean dark card over dimmed aesthetic background",
+        "pace": "8-12s loop",
+        "audio_style": "Ambient vinyl crackle with piano",
+        "hook": "Nobody asked for this timeline:",
+        "caption": "Can we fast forward to the part where aliens land and cancel our rent? 💀",
+        "sub_badge": "VIRAL THREAD 🐦",
+        "frame_design": "Ultra-sleek pitch black OLED card with blue checkmark and counters",
+        "text_style": "Inter clean typography with highlighted timestamps and metrics",
+        "color_grade": "dark_oled",
+        "quality_tip": "Keep card padding generous for authentic tweet screenshot aesthetic",
+        "viral_element": "Extremely shareable to Instagram Stories and DMs",
+        "icon": "🐦"
+    },
+    {
+        "id": "reel_savage_reality",
+        "name": "Savage Reality Check",
+        "category": "meme",
+        "theme": "Brutally Honest Unhinged Advice",
+        "location": "Reality Check Desk",
+        "pattern": "Brutal Disclaimer → Honest Mirror Talk → Unfiltered Reality Punchline",
+        "shot_type": "Dramatic high-contrast motion with golden text",
+        "pace": "Steely 10-14s resolute pace",
+        "audio_style": "Aggressive orchestral brass / phonk motivation",
+        "hook": "FRIENDLY REMINDER: NOBODY CARES.",
+        "caption": "They will judge you anyway, so you might as well fail doing what makes you happy.",
+        "sub_badge": "BRUTAL TRUTH 🖤",
+        "frame_design": "Dark vignette frame with gold and crimson accent stamps",
+        "text_style": "Bebas Neue & Outfit 900 high contrast uppercase typography",
+        "color_grade": "cinematic_contrast",
+        "quality_tip": "Deep black shadows with high dynamic range gold highlights",
+        "viral_element": "Save-for-later reality check + massive quote sharing",
+        "icon": "🖤"
+    },
+    {
+        "id": "reel_reddit_story",
+        "name": "r/AskReddit Deep Thoughts",
+        "category": "reddit",
+        "theme": "Viral Reddit Question & Unfiltered Answers",
+        "location": "Reddit Front Page",
+        "pattern": "Subreddit Badge → Upvote Counter → Dilemma Question → Top Confession",
+        "shot_type": "Narrative card over relaxing gameplay or background loop",
+        "pace": "12-16s storytelling cadence",
+        "audio_style": "Minecraft calm lo-fi / chill ambient",
+        "hook": "What is a harsh truth nobody talks about?",
+        "caption": "Nobody is coming to save you. Your peace and success are 100% your own responsibility.",
+        "sub_badge": "r/AskReddit 🤖",
+        "frame_design": "r/AskReddit pill, orange upvote counter, awards bar",
+        "text_style": "Inter clean UI typography with clear visual hierarchy",
+        "color_grade": "reddit_dark",
+        "quality_tip": "Keep card backdrop semi-translucent over motion gameplay/nature",
+        "viral_element": "Comments debating the answer + massive storytelling retention",
+        "icon": "🤖"
+    },
+    {
+        "id": "reel_reddit_confession",
+        "name": "r/Confession Dark Secrets",
+        "category": "reddit",
+        "theme": "Anonymous Dramatic Reddit Confession",
+        "location": "r/Confessions Midnight",
+        "pattern": "Confession Banner → Anonymous Handle → Dramatic Setup → Unfiltered Reveal",
+        "shot_type": "Floating dark narrative card with subtle slow zoom",
+        "pace": "Suspenseful 12-16s",
+        "audio_style": "Tense cinematic ambient piano",
+        "hook": "I kept this secret for 8 years and today it came out...",
+        "caption": "Sometimes the truth hurts, but living a lie costs your entire peace of mind.",
+        "sub_badge": "r/Confessions 🤐",
+        "frame_design": "Dark confession box with lock icon and anonymous user tag",
+        "text_style": "Plus Jakarta Sans clean narrative typography",
+        "color_grade": "reddit_dark",
+        "quality_tip": "Story cadence keeps viewers hooked until the final 2 seconds",
+        "viral_element": "Dramatic curiosity loop drives extreme watch time retention",
+        "icon": "🤐"
+    },
+    {
+        "id": "reel_reddit_aita",
+        "name": "r/AITA Dramatic Storytime",
+        "category": "reddit",
+        "theme": "Moral Dilemma & Outrageous Drama",
+        "location": "r/AmITheAsshole Thread",
+        "pattern": "Judgment Badge [AITA?] → Bizarre Family/Work Dilemma → Crowd Reaction",
+        "shot_type": "Story card over satisfying motion footage",
+        "pace": "12-15s story pacing",
+        "audio_style": "Lo-fi beat with soft guitar",
+        "hook": "AITA for telling my boss what everyone actually thinks?",
+        "caption": "The room went dead silent. Now I'm in HR and writing this on the company bathroom break.",
+        "sub_badge": "r/AmITheAsshole 🚩",
+        "frame_design": "Red flag badge, dilemma header, voting prompt at bottom",
+        "text_style": "Inter bold modern layout with red and amber highlights",
+        "color_grade": "reddit_dark",
+        "quality_tip": "Clear bold hook in first 1.5 seconds prevents scrolling away",
+        "viral_element": "Comments flood in with 'YTA' or 'NTA' judgments",
+        "icon": "🚩"
+    },
+    {
+        "id": "reel_mashup_montage",
+        "name": "4-Clip Fast-Paced Montage",
+        "category": "collab",
+        "theme": "Multi-Clip Mashup & Rapid Transition Montage",
+        "location": "Multi-Clip Video Editor",
+        "pattern": "Clip 1 Hook (2s) → Clip 2 Build (3s) → Clip 3 Drop (3s) → Clip 4 Punchline (2s)",
+        "shot_type": "Rapid 4-clip sequential montage cut",
+        "pace": "Fast 10-12s beat-synced cuts",
+        "audio_style": "Viral beat switch / Phonk drop / EDM build",
+        "hook": "THIS TOOK A COMPLETE 180° TURN 🤯",
+        "caption": "Watch till the final clip. The transition will melt your brain.",
+        "sub_badge": "4-CLIP MASHUP 🎬",
+        "frame_design": "Minimal top/bottom progress indicator with clip chapter markers",
+        "text_style": "Outfit 900 high energy punchy bold text",
+        "color_grade": "ai_sharp",
+        "quality_tip": "AI quality enhancer removes blur across multi-source clips",
+        "viral_element": "Extremely high rewatch rate to catch all 4 clips",
+        "icon": "🎬"
+    },
+    {
+        "id": "reel_brainrot_subway",
+        "name": "Dual Screen Brainrot (Headline + Gameplay)",
+        "category": "collab",
+        "theme": "Split Screen Brainrot (Top News + Bottom Gameplay)",
+        "location": "TikTok / Reels Algorithm Core",
+        "pattern": "Top: News/Reddit Headline Video → Bottom: Satisfying Gameplay / Meme Loop",
+        "shot_type": "50/50 Vertical split-screen collab",
+        "pace": "Fast continuous stimulation",
+        "audio_style": "Voiceover + subtle satisfying background audio",
+        "hook": "HOW MODERN SOCIETY CONSUMES INFORMATION 🧠",
+        "caption": "If the news doesn't have Subway Surfers under it, my brain physically rejects the information.",
+        "sub_badge": "DUAL BRAINROT 📱",
+        "frame_design": "50/50 horizontal divider bar with neon accent pulse",
+        "text_style": "Impact & Outfit high contrast center banner",
+        "color_grade": "clean_hd",
+        "quality_tip": "Lanczos scaling keeps both top and bottom clips pin-sharp",
+        "viral_element": "Highest engagement format on TikTok & Instagram Reels algorithms",
+        "icon": "📱"
+    },
+    {
+        "id": "reel_pip_commentary",
+        "name": "PiP Reaction / Commentary Collab",
+        "category": "collab",
+        "theme": "Main Footage + Corner Reaction Webcam",
+        "location": "Reaction Studio Deck",
+        "pattern": "Full Screen Background Video + Floating Corner Webcam / Reaction Meme",
+        "shot_type": "Picture-in-Picture floating reaction box",
+        "pace": "Continuous 10-14s",
+        "audio_style": "Commentary dialogue mixed with background audio",
+        "hook": "LIVE REACTION TO THIS ABSOLUTE MADNESS 🎙️",
+        "caption": "I don't even have words for what we just witnessed. Just look at this.",
+        "sub_badge": "REACTION PIP 👁️",
+        "frame_design": "Full screen main video with rounded border reaction card in corner",
+        "text_style": "Modern streamer font with glowing accent border",
+        "color_grade": "ai_sharp",
+        "quality_tip": "Audio normalization ensures speech and clip levels match perfectly",
+        "viral_element": "Human reaction facial expressions build immediate empathy & laughs",
+        "icon": "👁️"
+    },
+    {
+        "id": "reel_before_after",
+        "name": "Expectation vs Reality / VS Collab",
+        "category": "collab",
+        "theme": "Relatable Irony & Life Contrast",
+        "location": "Daily Reality",
+        "pattern": "Top Green Pill (BEFORE) → Center VS Badge → Bottom Red Pill (AFTER)",
+        "shot_type": "Two-tone comparison framing",
+        "pace": "Punchy 6-9s quick loop",
+        "audio_style": "Funny fail sound / viral audio switch",
+        "hook": "HOW I PLANNED MY 2026:",
+        "caption": "MY LIFE DECIDING TO RUN ON 1% BATTERY AND CHAOS INSTEAD 😭",
+        "sub_badge": "EXPECTATION VS REALITY 🎭",
+        "frame_design": "Dual expectation/reality badges with contrasting color accents",
+        "text_style": "Outfit 900 bold black & white impact text",
+        "color_grade": "clean_hd",
+        "quality_tip": "Instant visual contrast creates immediate scroll-stopping power",
+        "viral_element": "High relatable tagging: 'Bro this is literally you'",
+        "icon": "🎭"
+    },
+    {
+        "id": "reel_podcast_clip",
+        "name": "Podcast Soundwave & Highlight Subtitles",
+        "category": "creator",
+        "theme": "Viral Interview & Mind-Blowing Revelation",
+        "location": "Podcast Studio",
+        "pattern": "Mic Pill → Floating Speaker Tag → Audio Waveform → Subtitle Box",
+        "shot_type": "Dynamic speech clip",
+        "pace": "Snappy speech pacing 10-15s",
+        "audio_style": "Clear speech dialogue with subtle beat",
+        "hook": "WAIT TILL HE EXPLAINS THIS 🤯",
+        "caption": "“Most people are not afraid of failure. They are terrified of being seen trying.”",
+        "sub_badge": "DEEP DIVE 🎙️",
+        "frame_design": "Microphone badge, animated audio waveform visualizer, yellow highlight bar",
+        "text_style": "Plus Jakarta Sans 800 with golden yellow keyword highlights",
+        "color_grade": "clean_hd",
+        "quality_tip": "Sync text punchiness with video pacing",
+        "viral_element": "Podcast clips have highest watch-time retention on Reels",
+        "icon": "🎙️"
+    },
+    {
+        "id": "reel_retro_vhs",
+        "name": "Retro 90s VHS Camcorder",
+        "category": "creator",
+        "theme": "Analog Nostalgia & Glitch Parody",
+        "location": "1998 Analog Camcorder",
+        "pattern": "PLAY Indicator → Timestamp → CRT Scanlines → Retro Punchline",
+        "shot_type": "Vintage tape camcorder look",
+        "pace": "Raw continuous footage with glitch cuts",
+        "audio_style": "Tape hiss with retro synthwave",
+        "hook": "MEMORIES FROM A GLITCHED UNIVERSE 📼",
+        "caption": "OCT. 12 1998 • The world before algorithms told us how to think.",
+        "sub_badge": "ANALOG VHS 📼",
+        "frame_design": "Flashing REC dot, PLAY 00:14:28, tracking scanline overlay",
+        "text_style": "Courier Prime retro monospace typography",
+        "color_grade": "vintage_vhs",
+        "quality_tip": "Subtle analog grain with chromatic cyan/magenta fringe",
+        "viral_element": "90s nostalgia trend + Gen-Z retro aesthetic",
+        "icon": "📼"
+    },
+    {
+        "id": "reel_neon_cyberpunk",
+        "name": "Cyberpunk Neon 2077 HUD",
+        "category": "creator",
+        "theme": "Sci-Fi Simulation & Futuristic Reality",
+        "location": "Neo-Tokyo 2049",
+        "pattern": "HUD Corner Brackets → Neon Glow Frame → Cybernetic Punchline",
+        "shot_type": "Cyberpunk city / night motion",
+        "pace": "Fast rhythmic cuts 8-12s",
+        "audio_style": "Cyberpunk darksynth / industrial bass",
+        "hook": "SYSTEM OVERRIDE // PROTOCOL 2077 ⚡",
+        "caption": "You are not stuck in traffic. You are the traffic. Wake up samurai.",
+        "sub_badge": "NEO TOKYO 2077 ⚡",
+        "frame_design": "Electric cyan & neon magenta dual-tone glowing borders",
+        "text_style": "Space Grotesk bold futuristic tech typography with neon drop shadow",
+        "color_grade": "neon_cyber",
+        "quality_tip": "High saturation with crisp neon glow falloff",
+        "viral_element": "Visually striking electric contrast + futuristic dark humor",
+        "icon": "⚡"
+    }
+]
+
+
 def generate_reel_hooks(title, publisher="", category="", vibe="dark"):
     """
-    Generate 4 viral short-form 9:16 Reel hooks tailored for Instagram Reels using Groq LLM.
+    Generate viral 9:16 Reel hooks tailored across News, Dark Memes, Reddit Stories, and Collabs.
     """
-    title_clean = re.sub(r'[\r\n\t]+', ' ', title).strip()
+    title_clean = ' '.join(title.split()).strip()
 
-    prompt = f"""You are an elite 9:16 Instagram Reels viral hook creator.
-News Story: "{title_clean}"
-Publisher: "{publisher}"
-Vibe: {vibe} (dark humor, curiosity gap, deep meme think, savage punchline)
+    vibe_descriptions = {
+        "dark": "dark humor, existential irony, deep meme think, savage punchlines, simulation glitches",
+        "news": "breaking news parody, dramatic headlines, live TV broadcast commentary, urgent alerts",
+        "reddit": "r/AskReddit dilemmas, r/Confessions secrets, r/AITA dramatic relationship stories",
+        "savage": "savage reality check, unhinged sarcasm, relatable financial/work dread",
+        "collab": "multi-clip meme mashup, reaction drops, dual screen comparison",
+        "brainrot": "Gen-Z surreal humor, satisfying gameplay combo, viral TikTok irony",
+        "creator": "podcast wisdom highlight, retro VHS nostalgia, cyberpunk aesthetic"
+    }
+    vibe_context = vibe_descriptions.get(vibe, "viral short-form engagement, curiosity gap, relatable punchlines")
 
-Generate 4 viral 9:16 Reel hooks optimized for maximum retention on Instagram Reels:
-Structure requirements:
-1. reel_split: Top Hook for Split-Screen News Card (Bold lead, e.g. "POV: YOU OPENED THE NEWS TODAY 💀") + Caption punchline
-2. reel_chyron: TV Breaking News lower-third headline punchline
-3. reel_glass_card: Floating POV Reaction quote (Deep meme think / existential shock)
-4. reel_impact: Bold impact punchline
+    prompt = f"""You are an elite viral 9:16 Instagram Reels & TikTok creator with 5M followers.
+News Headline or Topic: "{title_clean}"
+Publisher/Source: "{publisher}"
+Target Category: "{category}"
+Vibe Request: {vibe} ({vibe_context})
 
-Respond ONLY with valid JSON in this exact structure:
+Generate 4 viral 9:16 Reel hooks and captions tailored to this vibe.
+Select from our 20 viral patterns:
+- reel_split (Split-Screen Breaking News Card)
+- reel_chyron (Breaking TV Live Parody & Ticker)
+- reel_unusual_whales (Market & Money Satire)
+- reel_fake_notification (Shock Breaking Notification)
+- reel_headline_reaction (Headline + Meme Reaction Collab)
+- reel_dark_humor (Existential Dark Meme)
+- reel_impact (Classic Savage Impact Meme)
+- reel_simulation_glitch (Simulation Glitch Matrix)
+- reel_tweet_dark (OLED Dark Mode Viral X Thread)
+- reel_savage_reality (Savage Reality Check)
+- reel_reddit_story (r/AskReddit Deep Thoughts)
+- reel_reddit_confession (r/Confession Dark Secrets)
+- reel_reddit_aita (r/AITA Dramatic Storytime)
+- reel_mashup_montage (4-Clip Fast-Paced Montage)
+- reel_brainrot_subway (Dual Screen Brainrot Collab)
+- reel_pip_commentary (PiP Reaction Commentary)
+- reel_before_after (Expectation vs Reality Contrast)
+- reel_podcast_clip (Podcast Soundwave & Subtitles)
+- reel_retro_vhs (Retro 90s VHS Camcorder)
+- reel_neon_cyberpunk (Cyberpunk Neon 2077 HUD)
+
+Respond ONLY with valid JSON:
 {{
   "headline": "{title_clean}",
   "hooks": [
     {{
       "layout": "reel_split",
       "top_hook": "POV: YOU OPENED THE NEWS TODAY 💀",
-      "caption": "Savage punchline / deep thought explaining the news",
+      "caption": "Savage commentary or dark meme reflection on this story...",
       "sub_badge": "WAIT TILL THE END 😭",
-      "vibe": "Viral Split Screen"
+      "vibe": "Breaking News"
     }},
     {{
-      "layout": "reel_chyron",
-      "top_hook": "🔴 BREAKING: THE SIMULATION GLITCHED AGAIN",
-      "caption": "Deep dark commentary punchline",
-      "sub_badge": "HAPPENING RIGHT NOW",
-      "vibe": "Live Broadcast Satire"
+      "layout": "reel_reddit_story",
+      "top_hook": "What is a harsh truth nobody talks about?",
+      "caption": "Deep unfiltered confession or observation...",
+      "sub_badge": "r/AskReddit 🤖",
+      "vibe": "Reddit Story"
     }},
     {{
-      "layout": "reel_glass_card",
-      "top_hook": "Bro negotiated this before my rent got paid 💀",
-      "caption": "Existential reaction quote to the headline",
-      "sub_badge": "EXPLAIN THIS BRO",
-      "vibe": "Deep Meme Think 🧠"
+      "layout": "reel_dark_humor",
+      "top_hook": "Smiling through the existential dread 🙂",
+      "caption": "Just another completely normal day on planet Earth...",
+      "sub_badge": "DARK HUMOR 💀",
+      "vibe": "Dark Meme"
     }},
     {{
-      "layout": "reel_impact",
-      "top_hook": "REALITY IN 2026 BE LIKE:",
-      "caption": "Dark punchline in bold words",
-      "sub_badge": "NO WAY THIS IS REAL",
-      "vibe": "Shock Value 🔥"
+      "layout": "reel_mashup_montage",
+      "top_hook": "THIS TOOK A COMPLETE 180° TURN 🤯",
+      "caption": "Watch till the final clip drop...",
+      "sub_badge": "4-CLIP MASHUP 🎬",
+      "vibe": "Collab Mashup"
     }}
   ],
-  "caption": "Viral reel caption for Instagram description with hashtags",
-  "hashtags": "#memes #darkhumor #viralreels #reelsindia #trending #deepthoughts"
+  "caption": "POV: YOU OPENED THE NEWS TODAY 💀\n\n{title_clean}\n\nWe really living in an unscripted simulation at this point 😭\n\nTag a friend who needs to see this 👇",
+  "hashtags": "#memes #darkhumor #news #redditstories #trending #reels #viral #relatable"
 }}"""
 
     raw = call_groq_chat([
-        {"role": "system", "content": "You are a master viral Instagram Reel hook engine. Respond ONLY with valid JSON."},
+        {"role": "system", "content": "You are a master viral meme & reel scriptwriter. Output strictly valid JSON."},
         {"role": "user", "content": prompt}
-    ], max_tokens=1400, temperature=0.85)
+    ], max_tokens=1000, temperature=0.85)
 
     if raw:
         try:
@@ -519,14 +1076,20 @@ Respond ONLY with valid JSON in this exact structure:
             if clean.startswith("```"):
                 clean = re.sub(r"^```(?:json)?\s*", "", clean)
                 clean = re.sub(r"\s*```$", "", clean)
-            parsed = json.loads(clean)
-            if "hooks" in parsed and len(parsed["hooks"]) > 0:
-                parsed["source"] = "groq"
+            try:
+                parsed = json.loads(clean)
+            except Exception:
+                m = re.search(r'(\{.*\})', clean, re.DOTALL)
+                if m:
+                    parsed = json.loads(m.group(1))
+                else:
+                    raise
+            if "hooks" in parsed and isinstance(parsed["hooks"], list):
                 return parsed
         except Exception as e:
-            print(f"[GROQ] Error parsing reel hooks JSON: {e}")
+            print(f"[GROQ] Error parsing reel hooks: {e}")
 
-    # Fallback hooks
+    # Fallback viral hooks
     return {
         "headline": title_clean,
         "publisher": publisher,
@@ -538,81 +1101,32 @@ Respond ONLY with valid JSON in this exact structure:
                 "top_hook": "POV: YOU OPENED THE NEWS TODAY 💀",
                 "caption": title_clean,
                 "sub_badge": "WAIT TILL THE END 😭",
-                "vibe": "Viral Split Screen"
+                "vibe": "Breaking News"
             },
             {
                 "layout": "reel_chyron",
                 "top_hook": f"🔴 BREAKING: {publisher.upper() if publisher else 'LIVE REPORT'}",
                 "caption": title_clean,
                 "sub_badge": "HAPPENING RIGHT NOW",
-                "vibe": "Live Broadcast"
+                "vibe": "Live TV"
             },
             {
-                "layout": "reel_glass_card",
-                "top_hook": "Nobody asked for this timeline:",
+                "layout": "reel_reddit_story",
+                "top_hook": "What is a harsh truth nobody talks about?",
                 "caption": f"“{title_clean}”",
-                "sub_badge": "EXPLAIN THIS BRO 😭",
-                "vibe": "Reaction Card"
+                "sub_badge": "r/AskReddit 🤖",
+                "vibe": "Reddit Story"
             },
             {
-                "layout": "reel_impact",
-                "top_hook": "REALITY IN 2026 BE LIKE:",
+                "layout": "reel_dark_humor",
+                "top_hook": "Smiling through the existential dread 🙂",
                 "caption": title_clean,
-                "sub_badge": "NO WAY THIS IS REAL",
-                "vibe": "Classic Shock"
+                "sub_badge": "DARK HUMOR 💀",
+                "vibe": "Dark Meme"
             }
         ],
-        "caption": f"POV: YOU OPENED THE NEWS TODAY 💀\n\n{title_clean}",
-        "hashtags": "#memes #darkhumor #viralreels #reelsindia #trending #news"
-    }
-
-
-def generate_ai_caption(title, publisher="", hook="", vibe="dark"):
-    """
-    Generate an engaging, viral Instagram post caption with deep dark humor, punchlines, and hashtags.
-    """
-    clean_title = re.sub(r'[\r\n\t]+', ' ', title).strip()
-
-    prompt = f"""You are a master social media copywriter for a viral dark humor meme page with 1M followers.
-News Headline: "{clean_title}"
-Publisher: "{publisher}"
-Hook: "{hook}"
-
-Write an ultra-engaging Instagram caption for this news meme / reel.
-Include:
-1. Punchy hook / lead (POV or savage one-liner with emojis)
-2. 2-3 lines of deep dark humor / existential meme commentary
-3. Call-to-action ("Tag someone who..." or "Drop your thoughts below 💀")
-4. 10 viral trending hashtags
-
-Respond ONLY with valid JSON:
-{{
-  "caption": "Full Instagram caption formatted with clean linebreaks and emojis",
-  "hashtags": "#memes #darkhumor #news #trending #viral #deepmemes #reelsindia #relatable"
-}}"""
-
-    raw = call_groq_chat([
-        {"role": "system", "content": "You write viral dark meme captions. Output strictly valid JSON."},
-        {"role": "user", "content": prompt}
-    ], max_tokens=800, temperature=0.85)
-
-    if raw:
-        try:
-            clean = raw.strip()
-            if clean.startswith("```"):
-                clean = re.sub(r"^```(?:json)?\s*", "", clean)
-                clean = re.sub(r"\s*```$", "", clean)
-            parsed = json.loads(clean)
-            if "caption" in parsed and parsed["caption"]:
-                return parsed
-        except Exception as e:
-            print(f"[GROQ] Error parsing AI caption: {e}")
-
-    # Fallback caption
-    fallback_caption = f"{hook if hook else 'POV: You opened the news today 💀'}\n\n{clean_title}\n\nWe really living in an unscripted simulation at this point 😭\n\nTag a friend who needs to see this 👇"
-    return {
-        "caption": fallback_caption,
-        "hashtags": "#memes #darkhumor #news #trending #viral #relatable #dailynews"
+        "caption": f"POV: YOU OPENED THE NEWS TODAY 💀\n\n{title_clean}\n\nWe really living in an unscripted simulation at this point 😭\n\nTag a friend who needs to see this 👇",
+        "hashtags": "#memes #darkhumor #news #redditstories #trending #viral #reels"
     }
 
 
@@ -625,15 +1139,44 @@ def check_video_has_audio(vid_path):
         return False
 
 
-def compose_reel_video(vid_name, overlay_data, layout="reel_split", duration=12):
+def compose_multi_clip_reel(
+    clips=None,
+    vid_name="sample_reel.mp4",
+    overlay_data="",
+    layout="reel_split",
+    duration=12,
+    quality="hd1080",
+    color_grade="none",
+    collab_mode="single",
+    quality_enhancement=True
+):
     """
-    Composites the background video with the exact transparent layout overlay from browser canvas.
-    Burns the edited headline, news card, emojis, tags, and formatting directly into every frame of the video.
-    Guarantees Instagram Reels 100% compliant H.264 MP4 with AAC stereo sound.
+    Composites 1, 2, 3, or 4 video clips into a high-octane 9:16 Reel.
+    Supports Collab Mashup modes:
+      - 'sequence': Sequential multi-clip mashup montage (Clip 1 -> Clip 2 -> Clip 3 -> Clip 4)
+      - 'split2': Top/Bottom 50-50 vertical split-screen collab (e.g. News + Subway Surfers/Meme)
+      - 'split4': Quad 2x2 grid collage collab
+      - 'pip': Picture-in-Picture floating reaction webcam box over main video
+      - 'single': Single video enhanced with Lanczos & overlay
+    AI Quality Enhancement:
+      - Unsharp contrast adaptive sharpening
+      - High dynamic range color vibrance pop
+      - Dual-pass audio loudnorm normalization
+      - 1080x1920 Full HD 60fps CRF 16 Master export with Faststart
     """
-    src_path = os.path.join(VIDEO_DIR, os.path.basename(vid_name)) if vid_name else ""
-    if not src_path or not os.path.exists(src_path) or os.path.getsize(src_path) < 1000:
-        src_path = os.path.join(VIDEO_DIR, "sample_reel.mp4")
+    resolved_clips = []
+    if clips and isinstance(clips, list):
+        for c in clips:
+            c_name = c.get("filename") if isinstance(c, dict) else str(c)
+            c_path = os.path.join(VIDEO_DIR, os.path.basename(c_name)) if c_name else ""
+            if c_path and os.path.exists(c_path) and os.path.getsize(c_path) > 1000:
+                resolved_clips.append(c_path)
+
+    if not resolved_clips:
+        single_path = os.path.join(VIDEO_DIR, os.path.basename(vid_name)) if vid_name else ""
+        if not single_path or not os.path.exists(single_path) or os.path.getsize(single_path) < 1000:
+            single_path = os.path.join(VIDEO_DIR, "sample_reel.mp4")
+        resolved_clips = [single_path]
 
     timestamp = int(time.time())
     overlay_path = os.path.join(VIDEO_DIR, f"temp_overlay_{timestamp}.png")
@@ -646,59 +1189,194 @@ def compose_reel_video(vid_name, overlay_data, layout="reel_split", duration=12)
     out_name = f"composed_reel_{timestamp}.mp4"
     out_path = os.path.join(VIDEO_DIR, out_name)
 
-    has_audio = check_video_has_audio(src_path)
+    target_w, target_h = (1080, 1920) if quality == "hd1080" else (720, 1280)
 
-    # 9:16 layout composite filter
-    if layout == "reel_split":
-        fc = (
-            "color=c=black:s=720x1280:r=30[bg];"
-            "[0:v]scale=720:768:force_original_aspect_ratio=increase,crop=720:768[vid];"
-            "[bg][vid]overlay=0:512:shortest=1[base];"
-            "[base][1:v]overlay=0:0[v]"
+    # Color Grade Chains
+    cg_filter_map = {
+        "clean_hd": "eq=contrast=1.08:saturation=1.15,unsharp=5:5:1.0:5:5:0.0",
+        "ai_sharp": "unsharp=5:5:1.4:5:5:0.3,eq=contrast=1.15:brightness=0.01:saturation=1.20",
+        "dark_oled": "eq=contrast=1.35:brightness=-0.04:saturation=1.10",
+        "cinematic_contrast": "eq=contrast=1.24:saturation=1.18:brightness=-0.02,unsharp=5:5:0.8:5:5:0.0",
+        "reddit_dark": "eq=contrast=1.20:brightness=-0.03:saturation=1.05",
+        "vintage_vhs": "eq=saturation=1.25:contrast=1.15:brightness=0.02",
+        "neon_cyber": "eq=contrast=1.25:saturation=1.35:brightness=0.01",
+        "news_vivid": "eq=contrast=1.12:saturation=1.22:brightness=0.02",
+        "golden_film": "eq=contrast=1.14:brightness=0.02:saturation=1.28,colorbalance=rs=0.15:gs=0.05:bs=-0.12",
+        "warm_saffron": "eq=contrast=1.14:brightness=0.03:saturation=1.30",
+        "heaven_clouds": "eq=contrast=1.06:brightness=0.06:saturation=1.15",
+        "none": ""
+    }
+    cg_raw = cg_filter_map.get(color_grade, "")
+    grade_step = f"{cg_raw}," if cg_raw else ""
+
+    # AI Quality Enhancer (Sharpness & HDR Pop)
+    enh_step = "unsharp=5:5:1.2:5:5:0.2,eq=contrast=1.12:brightness=0.01:saturation=1.18," if quality_enhancement else ""
+
+    num_clips = len(resolved_clips)
+    ovl_input_idx = num_clips
+    cmd_inputs = []
+
+    for c_path in resolved_clips:
+        cmd_inputs.extend(["-i", c_path])
+    cmd_inputs.extend(["-i", overlay_path])
+
+    filter_complex = ""
+    map_audio_label = "[norm_a]"
+
+    if collab_mode == "sequence" and num_clips > 1:
+        # Sequential Mashup / Montage of 2 to 4 clips
+        seg_dur = round(max(2.0, float(duration) / num_clips), 2)
+        v_segs = []
+        a_segs = []
+
+        for i, c_path in enumerate(resolved_clips):
+            v_segs.append(f"[{i}:v]trim=0:{seg_dur},setpts=PTS-STARTPTS,{enh_step}{grade_step}scale={target_w}:{target_h}:flags=lanczos:force_original_aspect_ratio=increase,crop={target_w}:{target_h}[v{i}]")
+            if check_video_has_audio(c_path):
+                a_segs.append(f"[{i}:a]atrim=0:{seg_dur},asetpts=PTS-STARTPTS,aformat=sample_rates=48000:channel_layouts=stereo[a{i}]")
+            else:
+                a_segs.append(f"anullsrc=channel_layout=stereo:sample_rate=48000:d={seg_dur}[a{i}]")
+
+        cat_inputs = "".join(f"[v{i}][a{i}]" for i in range(num_clips))
+        concat_part = f"{cat_inputs}concat=n={num_clips}:v=1:a=1[base_v][cat_a]"
+        audio_norm_part = "[cat_a]loudnorm=I=-16:TP=-1.5:LRA=11[norm_a]"
+        overlay_part = f"[{ovl_input_idx}:v]scale={target_w}:{target_h}:flags=lanczos[ovl_s];[base_v][ovl_s]overlay=0:0[v]"
+
+        filter_complex = ";".join(v_segs + a_segs) + ";" + concat_part + ";" + audio_norm_part + ";" + overlay_part
+
+    elif collab_mode == "split2" and num_clips >= 2:
+        # Dual Split-Screen Collab (Top clip + Bottom clip)
+        half_h = target_h // 2
+        clip0_audio = check_video_has_audio(resolved_clips[0])
+        clip1_audio = check_video_has_audio(resolved_clips[1])
+
+        v_filter = (
+            f"[0:v]trim=0:{duration},setpts=PTS-STARTPTS,{enh_step}{grade_step}scale={target_w}:{half_h}:flags=lanczos:force_original_aspect_ratio=increase,crop={target_w}:{half_h}[v_top];"
+            f"[1:v]trim=0:{duration},setpts=PTS-STARTPTS,{enh_step}{grade_step}scale={target_w}:{half_h}:flags=lanczos:force_original_aspect_ratio=increase,crop={target_w}:{half_h}[v_bot];"
+            f"[v_top][v_bot]vstack=inputs=2[base_v];"
+            f"[{ovl_input_idx}:v]scale={target_w}:{target_h}:flags=lanczos[ovl_s];"
+            f"[base_v][ovl_s]overlay=0:0[v]"
         )
+
+        if clip0_audio and clip1_audio:
+            a_filter = f"[0:a][1:a]amix=inputs=2:duration=first:dropout_transition=2,loudnorm=I=-16:TP=-1.5:LRA=11[norm_a]"
+        elif clip0_audio:
+            a_filter = f"[0:a]loudnorm=I=-16:TP=-1.5:LRA=11[norm_a]"
+        elif clip1_audio:
+            a_filter = f"[1:a]loudnorm=I=-16:TP=-1.5:LRA=11[norm_a]"
+        else:
+            a_filter = f"anullsrc=channel_layout=stereo:sample_rate=48000:d={duration}[norm_a]"
+
+        filter_complex = f"{v_filter};{a_filter}"
+
+    elif collab_mode == "pip" and num_clips >= 2:
+        # Picture-in-Picture Reaction Collab
+        pip_w = int(target_w * 0.40)
+        pip_h = int(pip_w * 1.33)
+        pip_x = target_w - pip_w - 36
+        pip_y = target_h - pip_h - 120
+
+        clip0_audio = check_video_has_audio(resolved_clips[0])
+        clip1_audio = check_video_has_audio(resolved_clips[1])
+
+        v_filter = (
+            f"[0:v]trim=0:{duration},setpts=PTS-STARTPTS,{enh_step}{grade_step}scale={target_w}:{target_h}:flags=lanczos:force_original_aspect_ratio=increase,crop={target_w}:{target_h}[v_main];"
+            f"[1:v]trim=0:{duration},setpts=PTS-STARTPTS,{enh_step}scale={pip_w}:{pip_h}:flags=lanczos:force_original_aspect_ratio=increase,crop={pip_w}:{pip_h}[v_pip];"
+            f"[v_main][v_pip]overlay={pip_x}:{pip_y}[base_v];"
+            f"[{ovl_input_idx}:v]scale={target_w}:{target_h}:flags=lanczos[ovl_s];"
+            f"[base_v][ovl_s]overlay=0:0[v]"
+        )
+
+        if clip0_audio and clip1_audio:
+            a_filter = f"[0:a][1:a]amix=inputs=2:duration=first:dropout_transition=2,loudnorm=I=-16:TP=-1.5:LRA=11[norm_a]"
+        elif clip0_audio:
+            a_filter = f"[0:a]loudnorm=I=-16:TP=-1.5:LRA=11[norm_a]"
+        else:
+            a_filter = f"anullsrc=channel_layout=stereo:sample_rate=48000:d={duration}[norm_a]"
+
+        filter_complex = f"{v_filter};{a_filter}"
+
     else:
-        fc = "[0:v]scale=720:1280:force_original_aspect_ratio=increase,crop=720:1280[vid];[vid][1:v]overlay=0:0[v]"
+        # Single Video / Split News Layout
+        has_audio = check_video_has_audio(resolved_clips[0])
+        if layout == "reel_split":
+            card_h = int(510 * (target_h / 1280))
+            vid_h = target_h - card_h
+            v_filter = (
+                f"color=c=black:s={target_w}x{target_h}:r=30[bg];"
+                f"[0:v]trim=0:{duration},setpts=PTS-STARTPTS,{enh_step}{grade_step}scale={target_w}:{vid_h}:flags=lanczos:force_original_aspect_ratio=increase,crop={target_w}:{vid_h}[vid];"
+                f"[bg][vid]overlay=0:{card_h}:shortest=1[base];"
+                f"[1:v]scale={target_w}:{target_h}:flags=lanczos[ovl];"
+                f"[base][ovl]overlay=0:0[v]"
+            )
+        else:
+            v_filter = (
+                f"[0:v]trim=0:{duration},setpts=PTS-STARTPTS,{enh_step}{grade_step}scale={target_w}:{target_h}:flags=lanczos:force_original_aspect_ratio=increase,crop={target_w}:{target_h}[vid];"
+                f"[1:v]scale={target_w}:{target_h}:flags=lanczos[ovl];"
+                f"[vid][ovl]overlay=0:0[v]"
+            )
 
-    cmd = [
-        FFMPEG_PATH, "-y",
-        "-i", src_path,
-        "-i", overlay_path
-    ]
+        if has_audio:
+            a_filter = f"[0:a]loudnorm=I=-16:TP=-1.5:LRA=11[norm_a]"
+        else:
+            a_filter = f"anullsrc=channel_layout=stereo:sample_rate=48000:d={duration}[norm_a]"
 
-    if not has_audio:
-        cmd.extend(["-f", "lavfi", "-i", "anullsrc=channel_layout=stereo:sample_rate=44100"])
+        filter_complex = f"{v_filter};{a_filter}"
 
+    crf_val = "16" if quality == "hd1080" else "19"
+    bitrate = "10M" if quality == "hd1080" else "5M"
+    preset = "medium" if quality == "hd1080" else "veryfast"
+
+    cmd = [FFMPEG_PATH, "-y"]
+    cmd.extend(cmd_inputs)
     cmd.extend([
-        "-filter_complex", fc,
+        "-filter_complex", filter_complex,
         "-map", "[v]",
-        "-map", ("2:a" if not has_audio else "0:a?"),
+        "-map", map_audio_label,
         "-c:v", "libx264",
         "-pix_fmt", "yuv420p",
-        "-preset", "veryfast",
-        "-crf", "22",
+        "-preset", preset,
+        "-crf", crf_val,
+        "-b:v", bitrate,
+        "-maxrate", "14M",
+        "-bufsize", "18M",
         "-c:a", "aac",
-        "-b:a", "128k",
+        "-b:a", "192k",
+        "-ar", "48000",
         "-t", str(duration),
         "-movflags", "+faststart",
         out_path
     ])
 
-    res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=40)
+    print(f"[COMPOSE] Running multi-clip FFmpeg command for {len(resolved_clips)} clip(s), mode={collab_mode}, quality={quality}...")
+    res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=90)
 
     # Clean up temp overlay
     if os.path.exists(overlay_path):
-        try:
-            os.remove(overlay_path)
-        except Exception:
-            pass
+        try: os.remove(overlay_path)
+        except Exception: pass
 
     if res.returncode != 0 or not os.path.exists(out_path) or os.path.getsize(out_path) < 1000:
         err = res.stderr.decode("utf-8", errors="ignore")
         print(f"[COMPOSE] Error running FFmpeg: {err}")
-        raise RuntimeError(f"FFmpeg composite failed: {err[:200]}")
+        raise RuntimeError(f"FFmpeg composite failed: {err[:250]}")
 
-    print(f"[COMPOSE] Successfully composed 9:16 Reel: {out_name} (size={os.path.getsize(out_path)} bytes)")
+    print(f"[COMPOSE] Successfully generated 9:16 HD Collab Reel ({quality}, {collab_mode}): {out_name} (size={os.path.getsize(out_path)} bytes)")
     return out_name, out_path
+
+
+# Backward compatible alias for existing single video callers (Instagram publish, etc.)
+def compose_reel_video(vid_name, overlay_data, layout="reel_split", duration=12, quality="hd1080", color_grade="none", clips=None, collab_mode="single", quality_enhancement=True):
+    return compose_multi_clip_reel(
+        clips=clips,
+        vid_name=vid_name,
+        overlay_data=overlay_data,
+        layout=layout,
+        duration=duration,
+        quality=quality,
+        color_grade=color_grade,
+        collab_mode=collab_mode,
+        quality_enhancement=quality_enhancement
+    )
 
 
 def serve_video_file(file_path, handler):
@@ -782,6 +1460,14 @@ class NewsServerHandler(http.server.SimpleHTTPRequestHandler):
 
         if path == "/api/topics":
             return self.send_json({"topics": constants.TOPICS})
+
+        # 20 Viral Reel patterns, hooks, and quality dataset
+        if path == "/api/reel-dataset":
+            return self.send_json({
+                "success": True,
+                "total": len(VIRAL_REEL_DATASET),
+                "patterns": VIRAL_REEL_DATASET
+            })
 
         # Instagram connection status
         if path == "/api/instagram/status":
@@ -1005,11 +1691,12 @@ class NewsServerHandler(http.server.SimpleHTTPRequestHandler):
                 return self.send_json({"error": "URL or search query is required"}, status=400)
 
             try:
-                filename, title = fetch_or_search_video(target, is_search=(mode == "search"))
+                filename, title, vid_info = fetch_or_search_video(target, is_search=(mode == "search"))
                 return self.send_json({
                     "success": True,
                     "videoUrl": f"/api/serve-video?name={filename}",
-                    "title": title
+                    "title": title,
+                    "videoInfo": vid_info
                 })
             except Exception as e:
                 return self.send_json({"error": f"Failed to fetch video: {str(e)}"}, status=500)
@@ -1030,14 +1717,73 @@ class NewsServerHandler(http.server.SimpleHTTPRequestHandler):
             with open(target_path, "wb") as f:
                 f.write(video_data)
 
+            # Ensure H.264 MP4 conversion if needed
+            ensured_path = ensure_h264_mp4(target_path)
+            ensured_filename = os.path.basename(ensured_path)
+            vid_info = get_video_info(ensured_path)
+
             return self.send_json({
                 "success": True,
-                "filename": filename,
-                "videoUrl": f"/api/serve-video?name={filename}",
-                "title": "Uploaded Video"
+                "filename": ensured_filename,
+                "videoUrl": f"/api/serve-video?name={ensured_filename}",
+                "title": "Uploaded Video",
+                "videoInfo": vid_info
             })
 
-        # Render & Composite 9:16 Reel Video with custom layout & headline overlay
+        # Fetch Multiple Video URLs (1 to 4 Clips) for Multi-Clip Collab Studio
+        if path == "/api/fetch-multi-videos":
+            content_length = int(self.headers.get("Content-Length", 0))
+            post_body = self.rfile.read(content_length)
+            try:
+                payload = json.loads(post_body.decode("utf-8"))
+            except Exception:
+                payload = {}
+
+            urls = payload.get("urls", [])
+            if not isinstance(urls, list) or not urls:
+                return self.send_json({"error": "List of video URLs is required"}, status=400)
+
+            clean_urls = [str(u).strip() for u in urls[:4] if str(u).strip()]
+            if not clean_urls:
+                return self.send_json({"error": "No valid URLs provided"}, status=400)
+
+            from concurrent.futures import ThreadPoolExecutor
+
+            def fetch_single_clip(idx, clean_url):
+                try:
+                    filename, title, vid_info = fetch_or_search_video(clean_url, is_search=False)
+                    return {
+                        "id": f"clip_{idx}",
+                        "filename": filename,
+                        "videoUrl": f"/api/serve-video?name={filename}",
+                        "title": title,
+                        "videoInfo": vid_info,
+                        "originalUrl": clean_url
+                    }
+                except Exception as e:
+                    print(f"[MULTI-FETCH] Error fetching clip {idx} ({clean_url[:40]}): {e}")
+                    sample_name = "sample_reel.mp4"
+                    return {
+                        "id": f"clip_{idx}",
+                        "filename": sample_name,
+                        "videoUrl": f"/api/serve-video?name={sample_name}",
+                        "title": f"Clip {idx + 1} (Fallback)",
+                        "videoInfo": get_video_info(os.path.join(VIDEO_DIR, sample_name)),
+                        "originalUrl": clean_url,
+                        "error": str(e)
+                    }
+
+            with ThreadPoolExecutor(max_workers=min(4, len(clean_urls))) as executor:
+                futures = [executor.submit(fetch_single_clip, idx, u) for idx, u in enumerate(clean_urls)]
+                results = [f.result() for f in futures]
+
+            return self.send_json({
+                "success": True,
+                "clips": results,
+                "count": len(results)
+            })
+
+        # Render & Composite 9:16 Reel Video (Single Video or Multi-Clip Collab Mashup)
         if path == "/api/render-reel-video":
             content_length = int(self.headers.get("Content-Length", 0))
             post_body = self.rfile.read(content_length)
@@ -1047,20 +1793,38 @@ class NewsServerHandler(http.server.SimpleHTTPRequestHandler):
                 payload = {}
 
             video_name = payload.get("video_name", "")
+            clips = payload.get("clips", [])
+            collab_mode = payload.get("collab_mode", "sequence" if (clips and len(clips) > 1) else "single")
+            quality_enhancement = bool(payload.get("quality_enhancement", True))
             overlay = payload.get("overlay", "")
             layout = payload.get("layout", "reel_split")
             duration = int(payload.get("duration", 12))
+            quality = payload.get("quality", "hd1080")
+            color_grade = payload.get("color_grade", "none")
 
             if not overlay:
                 return self.send_json({"error": "Overlay graphic is required to render reel"}, status=400)
 
             try:
-                out_name, out_path = compose_reel_video(video_name, overlay, layout=layout, duration=duration)
+                out_name, out_path = compose_multi_clip_reel(
+                    clips=clips,
+                    vid_name=video_name,
+                    overlay_data=overlay,
+                    layout=layout,
+                    duration=duration,
+                    quality=quality,
+                    color_grade=color_grade,
+                    collab_mode=collab_mode,
+                    quality_enhancement=quality_enhancement
+                )
+                vid_info = get_video_info(out_path)
                 return self.send_json({
                     "success": True,
                     "filename": out_name,
                     "videoUrl": f"/api/serve-video?name={out_name}",
-                    "title": "Rendered 9:16 Reel"
+                    "title": "Rendered 9:16 HD Collab Reel",
+                    "collab_mode": collab_mode,
+                    "videoInfo": vid_info
                 })
             except Exception as e:
                 print(f"[REEL RENDER] Error: {e}")

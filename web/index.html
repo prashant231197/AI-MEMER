@@ -11,8 +11,8 @@
   <meta name="description" content="Turn today's live breaking news feeds into viral memes with AI punchlines and an interactive Meme Studio.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800;900&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=11.0">
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Cinzel:wght@600;700;900&family=Courier+Prime:ital,wght@0,400;0,700;1,400&family=Inter:wght@300;400;500;600;700;800&family=Outfit:wght@400;500;600;700;800;900&family=Playfair+Display:ital,wght@0,400;0,600;0,700;0,900;1,400;1,700&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css?v=16.0">
 </head>
 <body>
   <!-- Ambient background glow elements -->
@@ -404,41 +404,111 @@
         <!-- Right: Reel Studio Controls -->
         <div class="editor-controls reel-controls-scroll">
           
-          <!-- 1. Video Source Chooser -->
+          <!-- 1. Video Source & Multi-Clip Collab Studio -->
           <div class="editor-section">
-            <label class="section-label">1. Choose Video Source:</label>
+            <div class="section-label-row">
+              <label class="section-label">1. Video Source & Multi-Clip Collab Editor (1 to 4 Clips):</label>
+              <span id="reelHdQualityBadge" class="hd-quality-pill" style="display: none;">💎 1080p Full HD</span>
+            </div>
             <div class="video-tab-headers" id="videoSourceTabs">
-              <button class="vtab-btn active" data-vtab="paste">🔗 Paste URL</button>
-              <button class="vtab-btn" data-vtab="upload">📁 Upload Video</button>
+              <button class="vtab-btn active" data-vtab="paste">🔗 Multi-URL Collab (1-4)</button>
+              <button class="vtab-btn" data-vtab="upload">📁 Upload Videos</button>
               <button class="vtab-btn" data-vtab="autosearch">✨ Auto-Fetch</button>
-              <button class="vtab-btn" data-vtab="preset">⚡ Presets</button>
+              <button class="vtab-btn" data-vtab="preset">⚡ Viral Presets</button>
             </div>
 
-            <!-- Tab 1: Paste URL -->
+            <!-- Tab 1: Multi-URL Collab Studio -->
             <div class="vtab-content active" id="vtabPaste">
-              <p class="vtab-help">Paste Instagram Reel, YouTube Shorts, TikTok, or direct MP4 link:</p>
-              <div class="url-input-group">
-                <input type="text" id="reelUrlInput" class="form-input" placeholder="https://www.instagram.com/reel/... or https://youtube.com/shorts/...">
-                <button id="fetchReelUrlBtn" class="primary-btn">Fetch Video</button>
+              <p class="vtab-help">Paste 1 to 4 video links (Instagram Reel, YouTube Shorts, TikTok, MP4). System auto-fetches highest HD quality:</p>
+              
+              <div class="multi-clip-container" id="multiClipUrlContainer">
+                <div class="clip-url-row" data-clip-index="0">
+                  <span class="clip-index-badge">Clip 1</span>
+                  <input type="text" class="form-input multi-url-input" placeholder="Clip 1 Hook URL (e.g. https://youtube.com/shorts/...)" value="">
+                  <span class="clip-role-tag">Hook / Intro</span>
+                </div>
+                <div class="clip-url-row" data-clip-index="1">
+                  <span class="clip-index-badge">Clip 2</span>
+                  <input type="text" class="form-input multi-url-input" placeholder="Clip 2 Reaction / Meme URL (optional or collab)" value="">
+                  <button type="button" class="remove-clip-btn" title="Remove Clip" style="display: none;">✕</button>
+                  <span class="clip-role-tag">Reaction / Drop</span>
+                </div>
+              </div>
+
+              <div class="multi-clip-btn-row">
+                <button type="button" id="addClipUrlBtn" class="secondary-btn mini-btn" title="Add another clip URL (up to 4)">
+                  <span>➕ Add Clip (Max 4)</span>
+                </button>
+                <button id="autoCreateCollabEditBtn" class="primary-btn sparkle-glow-btn" style="flex: 1; padding: 10px 16px; font-size: 13px;">
+                  <span>⚡ Auto-Create Collab Edit (1-Click)</span>
+                </button>
+                <button id="fetchMultiClipsBtn" class="secondary-btn mini-btn" title="Download clips without rendering">
+                  <span>📥 Load Clips</span>
+                </button>
+              </div>
+
+              <!-- Collab Montage Mode Selector -->
+              <div class="collab-mode-box">
+                <label class="mini-label">🎬 Collab / Montage Edit Mode:</label>
+                <div class="collab-mode-grid" id="collabModeGrid">
+                  <button type="button" class="collab-btn active" data-collab="sequence" title="Sequential Montage (Clip 1 -> Clip 2 -> Clip 3 -> Clip 4)">
+                    <span class="collab-icon">🎞️</span>
+                    <span class="collab-name">Sequential Montage</span>
+                    <span class="collab-sub">Hook ➔ Drop ➔ Punchline</span>
+                  </button>
+                  <button type="button" class="collab-btn" data-collab="split2" title="Dual Vertical Split (Top Video + Bottom Video)">
+                    <span class="collab-icon">⚡</span>
+                    <span class="collab-name">Dual Split-Screen</span>
+                    <span class="collab-sub">Top / Bottom 50-50</span>
+                  </button>
+                  <button type="button" class="collab-btn" data-collab="split4" title="4-Way 2x2 Grid Collage">
+                    <span class="collab-icon">🎛️</span>
+                    <span class="collab-name">Quad Matrix (4-Way)</span>
+                    <span class="collab-sub">2x2 Collab Grid</span>
+                  </button>
+                  <button type="button" class="collab-btn" data-collab="pip" title="Picture-in-Picture Webcam / Reaction Overlay">
+                    <span class="collab-icon">💬</span>
+                    <span class="collab-name">PiP Reaction Drop</span>
+                    <span class="collab-sub">Floating Corner Overlay</span>
+                  </button>
+                </div>
+              </div>
+
+              <!-- AI Quality Enhancer Switch -->
+              <div class="ai-enhancer-card">
+                <div class="ai-enhancer-info">
+                  <div class="ai-enhancer-title">✨ AI Clarity & Quality Enhancer</div>
+                  <div class="ai-enhancer-desc">FFmpeg Unsharp Mask + HDR Contrast + Audio Loudness Normalizer (EBU R128)</div>
+                </div>
+                <label class="toggle-switch">
+                  <input type="checkbox" id="aiEnhanceToggle" checked>
+                  <span class="toggle-slider"></span>
+                </label>
+              </div>
+
+              <!-- Active Loaded Clips Deck Strip -->
+              <div class="active-clips-deck" id="activeClipsDeck" style="display: none;">
+                <div class="deck-label">Loaded Clips in Project:</div>
+                <div class="deck-chips" id="activeClipsChips"></div>
               </div>
             </div>
 
             <!-- Tab 2: Upload Video -->
             <div class="vtab-content" id="vtabUpload" style="display: none;">
-              <p class="vtab-help">Select any local video file (MP4, WebM, MOV):</p>
+              <p class="vtab-help">Select local video files (MP4, WebM, MOV):</p>
               <label class="upload-dropzone">
                 <span class="dropzone-icon">📁</span>
-                <span class="dropzone-text">Click to choose or drag video here</span>
-                <input type="file" id="reelVideoFileInput" accept="video/mp4,video/webm,video/quicktime" style="display: none;">
+                <span class="dropzone-text">Click to choose or drag 1 to 4 video clips here</span>
+                <input type="file" id="reelVideoFileInput" accept="video/mp4,video/webm,video/quicktime" multiple style="display: none;">
               </label>
             </div>
 
             <!-- Tab 3: Auto-Search Internet Video -->
             <div class="vtab-content" id="vtabAutoSearch" style="display: none;">
-              <p class="vtab-help">Search related video footage for this news story:</p>
+              <p class="vtab-help">Search related HD video footage for this story or dark meme:</p>
               <div class="url-input-group">
-                <input type="text" id="autoSearchQueryInput" class="form-input" placeholder="News topic or headline...">
-                <button id="autoSearchVideoBtn" class="accent-btn">Search Internet</button>
+                <input type="text" id="autoSearchQueryInput" class="form-input" placeholder="News topic, meme template or keyword...">
+                <button id="autoSearchVideoBtn" class="accent-btn">Search HD Video</button>
               </div>
             </div>
 
@@ -458,60 +528,294 @@
             </div>
           </div>
 
-          <!-- 2. Reel Layout Style -->
+          <!-- 2. Reel 20 Pattern Layout Style -->
           <div class="editor-section">
-            <label class="section-label">2. Select Reel Format (9:16):</label>
-            <div class="photo-layout-grid" id="reelLayoutGrid">
-              <button class="layout-btn active" data-reellayout="reel_split" title="White news card on top, video below - Most viral format!">
-                <span>📰 Split-Screen News Card</span>
+            <div class="section-label-row">
+              <label class="section-label">2. Select Pattern & Layout (20 Viral Styles):</label>
+              <button type="button" id="openDatasetLibraryBtn" class="sparkle-mini-btn" title="Open Viral Dataset & Ideas Catalog">
+                <span>📚 Viral Dataset</span>
               </button>
-              <button class="layout-btn" data-reellayout="reel_chyron" title="Live TV Breaking News lower-third banner over video">
-                <span>📺 Breaking TV Chyron</span>
+            </div>
+
+            <!-- Category filter pills for 20 patterns -->
+            <div class="pattern-category-tabs" id="patternCategoryTabs">
+              <button type="button" class="pcat-btn active" data-cat="all">🔥 All (20)</button>
+              <button type="button" class="pcat-btn" data-cat="news">📰 News & TV</button>
+              <button type="button" class="pcat-btn" data-cat="meme">💀 Dark Memes</button>
+              <button type="button" class="pcat-btn" data-cat="reddit">🤖 Reddit Stories</button>
+              <button type="button" class="pcat-btn" data-cat="collab">🎬 Collab & Mashup</button>
+              <button type="button" class="pcat-btn" data-cat="creator">🎙️ Creator & VHS</button>
+            </div>
+
+            <div class="photo-layout-grid pattern-grid-20" id="reelLayoutGrid">
+              <!-- 1. Split-Screen Breaking News Card (Default) -->
+              <button class="layout-btn active" data-reellayout="reel_split" data-cat="news" title="Top White News Card + Video Below">
+                <span class="layout-btn-icon">📰</span>
+                <span class="layout-btn-title">Split News Card</span>
+                <span class="layout-btn-sub">Top White Card</span>
               </button>
-              <button class="layout-btn" data-reellayout="reel_glass_card" title="Transparent floating POV card">
-                <span>💬 POV Floating Glass</span>
+
+              <!-- 2. Breaking TV Broadcast Chyron -->
+              <button class="layout-btn" data-reellayout="reel_chyron" data-cat="news" title="TV Lower-Third Headline & Animated Red Ticker">
+                <span class="layout-btn-icon">📺</span>
+                <span class="layout-btn-title">Breaking TV Chyron</span>
+                <span class="layout-btn-sub">Live Red Ticker</span>
               </button>
-              <button class="layout-btn" data-reellayout="reel_impact" title="Top & Bottom bold text">
-                <span>💥 Impact Text Overlay</span>
+
+              <!-- 3. Market & Money Reality Satire -->
+              <button class="layout-btn" data-reellayout="reel_unusual_whales" data-cat="news" title="Wall Street & Inflation Reality Satire Card">
+                <span class="layout-btn-icon">📉</span>
+                <span class="layout-btn-title">Market Reality Satire</span>
+                <span class="layout-btn-sub">Green Ticker Irony</span>
+              </button>
+
+              <!-- 4. Shock Breaking Notification -->
+              <button class="layout-btn" data-reellayout="reel_fake_notification" data-cat="news" title="iOS Glass Push Alert Notification Banner">
+                <span class="layout-btn-icon">🔔</span>
+                <span class="layout-btn-title">Shock Notification</span>
+                <span class="layout-btn-sub">iOS Glass Alert</span>
+              </button>
+
+              <!-- 5. Headline + Meme Reaction Collab -->
+              <button class="layout-btn" data-reellayout="reel_headline_reaction" data-cat="news" title="Top News Headline Banner + Bottom Reaction Drop">
+                <span class="layout-btn-icon">🚨</span>
+                <span class="layout-btn-title">Headline + Reaction</span>
+                <span class="layout-btn-sub">News Reaction Drop</span>
+              </button>
+
+              <!-- 6. Existential Dark Meme -->
+              <button class="layout-btn" data-reellayout="reel_dark_humor" data-cat="meme" title="Obsidian Dark Background + Toxic Accent + Existential Punchline">
+                <span class="layout-btn-icon">💀</span>
+                <span class="layout-btn-title">Dark Humor Existential</span>
+                <span class="layout-btn-sub">Toxic Dark Irony</span>
+              </button>
+
+              <!-- 7. Classic Savage Impact -->
+              <button class="layout-btn" data-reellayout="reel_impact" data-cat="meme" title="Classic Impact Meme Bold Stroked Font">
+                <span class="layout-btn-icon">💥</span>
+                <span class="layout-btn-title">Classic Impact</span>
+                <span class="layout-btn-sub">Bold Stroke</span>
+              </button>
+
+              <!-- 8. Simulation Glitch Error 404 -->
+              <button class="layout-btn" data-reellayout="reel_simulation_glitch" data-cat="meme" title="RGB Aberration Split + Matrix CRT Scanlines">
+                <span class="layout-btn-icon">👾</span>
+                <span class="layout-btn-title">Simulation Glitch</span>
+                <span class="layout-btn-sub">Error 404 Aberration</span>
+              </button>
+
+              <!-- 9. Viral Dark Tweet / X Card -->
+              <button class="layout-btn" data-reellayout="reel_tweet_dark" data-cat="meme" title="X / Twitter Dark Mode Viral Screenshot Card">
+                <span class="layout-btn-icon">🐦</span>
+                <span class="layout-btn-title">Viral Dark Tweet</span>
+                <span class="layout-btn-sub">X / Twitter Card</span>
+              </button>
+
+              <!-- 10. Savage Reality Check -->
+              <button class="layout-btn" data-reellayout="reel_savage_reality" data-cat="meme" title="Unfiltered Brutal Honesty Reality Card">
+                <span class="layout-btn-icon">🔥</span>
+                <span class="layout-btn-title">Savage Reality</span>
+                <span class="layout-btn-sub">Brutal Truth Alert</span>
+              </button>
+
+              <!-- 11. r/AskReddit Dilemma Card -->
+              <button class="layout-btn" data-reellayout="reel_reddit_story" data-cat="reddit" title="Reddit Narrative Card with Upvote Counter">
+                <span class="layout-btn-icon">🤖</span>
+                <span class="layout-btn-title">r/AskReddit Dilemma</span>
+                <span class="layout-btn-sub">Upvote Thread Card</span>
+              </button>
+
+              <!-- 12. r/Confessions Midnight Secret -->
+              <button class="layout-btn" data-reellayout="reel_reddit_confession" data-cat="reddit" title="Reddit Dark Mode Confession Card with Redacted Spoiler Bar">
+                <span class="layout-btn-icon">🤫</span>
+                <span class="layout-btn-title">Reddit Confession</span>
+                <span class="layout-btn-sub">Midnight Secret</span>
+              </button>
+
+              <!-- 13. r/AITA Dramatic Thread -->
+              <button class="layout-btn" data-reellayout="reel_reddit_aita" data-cat="reddit" title="Am I The A**hole? Verdict Stamp & Poll Ratio">
+                <span class="layout-btn-icon">⚖️</span>
+                <span class="layout-btn-title">r/AITA Drama Poll</span>
+                <span class="layout-btn-sub">Verdict Stamp</span>
+              </button>
+
+              <!-- 14. Multi-Clip Viral Montage -->
+              <button class="layout-btn" data-reellayout="reel_mashup_montage" data-cat="collab" title="Multi-Clip Collab Montage with Dynamic Cut Header">
+                <span class="layout-btn-icon">🎬</span>
+                <span class="layout-btn-title">Multi-Clip Mashup</span>
+                <span class="layout-btn-sub">Collab Montage Drop</span>
+              </button>
+
+              <!-- 15. Satisfying Brainrot Dual Split -->
+              <button class="layout-btn" data-reellayout="reel_brainrot_subway" data-cat="collab" title="Top Headline Video + Bottom Satisfying Gameplay/Meme Loop">
+                <span class="layout-btn-icon">🛹</span>
+                <span class="layout-btn-title">Brainrot Dual Split</span>
+                <span class="layout-btn-sub">Top News + Bottom Loop</span>
+              </button>
+
+              <!-- 16. PiP Reaction Commentary -->
+              <button class="layout-btn" data-reellayout="reel_pip_commentary" data-cat="collab" title="Floating Reaction Overlay Camera on Main Clip">
+                <span class="layout-btn-icon">💬</span>
+                <span class="layout-btn-title">PiP Reaction</span>
+                <span class="layout-btn-sub">Floating Overlay Web</span>
+              </button>
+
+              <!-- 17. Expectation vs Reality Split -->
+              <button class="layout-btn" data-reellayout="reel_before_after" data-cat="collab" title="Dual Split Expectation vs Reality Contrast">
+                <span class="layout-btn-icon">🎭</span>
+                <span class="layout-btn-title">Expectation / Reality</span>
+                <span class="layout-btn-sub">Contrast Split</span>
+              </button>
+
+              <!-- 18. Podcast Clip & Waveform -->
+              <button class="layout-btn" data-reellayout="reel_podcast_clip" data-cat="creator" title="Podcast Soundwave Visualizer & Speaker Subtitle">
+                <span class="layout-btn-icon">🎙️</span>
+                <span class="layout-btn-title">Podcast Waveform</span>
+                <span class="layout-btn-sub">Soundwave Visualizer</span>
+              </button>
+
+              <!-- 19. Retro 90s VHS Camcorder -->
+              <button class="layout-btn" data-reellayout="reel_retro_vhs" data-cat="creator" title="90s VHS Camcorder PLAY Stamp & Glitch Overlay">
+                <span class="layout-btn-icon">📼</span>
+                <span class="layout-btn-title">Retro 90s VHS</span>
+                <span class="layout-btn-sub">Analog Camcorder</span>
+              </button>
+
+              <!-- 20. Cyberpunk Neon Glow -->
+              <button class="layout-btn" data-reellayout="reel_neon_cyberpunk" data-cat="creator" title="Electric Violet & Cyan Neon Border Glow">
+                <span class="layout-btn-icon">⚡</span>
+                <span class="layout-btn-title">Cyberpunk Neon</span>
+                <span class="layout-btn-sub">Electric Glow</span>
               </button>
             </div>
           </div>
 
-          <!-- 3. Viral Hooks & Captions -->
+          <!-- 3. Color Grading & Video Aesthetics -->
+          <div class="editor-section">
+            <label class="section-label">3. Video Color Grading & Tone (HD Filter):</label>
+            <div class="color-grade-grid" id="reelColorGradeGrid">
+              <button type="button" class="cgrade-btn active" data-grade="none">💎 Pure HD (Natural)</button>
+              <button type="button" class="cgrade-btn" data-grade="ai_crystal">✨ AI Crystal Sharp</button>
+              <button type="button" class="cgrade-btn" data-grade="oled_midnight">🌑 OLED Midnight</button>
+              <button type="button" class="cgrade-btn" data-grade="cinematic_contrast">🎬 High Contrast Film</button>
+              <button type="button" class="cgrade-btn" data-grade="reddit_dark">🤖 Reddit Dark</button>
+              <button type="button" class="cgrade-btn" data-grade="vintage_vhs">📼 90s Analog Tape</button>
+              <button type="button" class="cgrade-btn" data-grade="neon_cyber">⚡ Neon Cyber Glow</button>
+              <button type="button" class="cgrade-btn" data-grade="news_vivid">📰 Breaking News Vivid</button>
+              <button type="button" class="cgrade-btn" data-grade="golden_film">🎞️ Golden Film Grain</button>
+            </div>
+          </div>
+
+          <!-- 4. Video Export Quality & Master Resolution -->
+          <div class="editor-section">
+            <label class="section-label">4. Master Video Export Resolution & Duration:</label>
+            <div class="quality-selector-row">
+              <div class="quality-radio-group">
+                <label class="quality-radio-card active">
+                  <input type="radio" name="reelQuality" value="hd1080" checked>
+                  <div class="q-card-content">
+                    <span class="q-title">💎 1080 × 1920 Full HD</span>
+                    <span class="q-desc">Master Studio 60fps (Recommended)</span>
+                  </div>
+                </label>
+                <label class="quality-radio-card">
+                  <input type="radio" name="reelQuality" value="hd720">
+                  <div class="q-card-content">
+                    <span class="q-title">⚡ 720 × 1280 Fast HD</span>
+                    <span class="q-desc">Ultra-fast preview export</span>
+                  </div>
+                </label>
+              </div>
+            </div>
+            <div class="duration-control-row" style="margin-top: 10px;">
+              <label for="reelDurationSelect" class="mini-label">Reel Length:</label>
+              <select id="reelDurationSelect" class="styled-select" style="max-width: 150px;">
+                <option value="6">6 Seconds (Fast Loop)</option>
+                <option value="10">10 Seconds (Standard)</option>
+                <option value="12" selected>12 Seconds (Optimal)</option>
+                <option value="15">15 Seconds (Story)</option>
+                <option value="20">20 Seconds (Extended)</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- 5. Viral Hooks & Captions -->
           <div class="editor-section">
             <div class="section-label-row">
-              <label class="section-label">3. ⚡ Groq AI Viral Reel Hooks:</label>
+              <label class="section-label">5. ⚡ Groq AI Viral Reel Hooks:</label>
               <button id="regenReelHooksBtn" class="text-link-btn">Regenerate</button>
             </div>
             <!-- Vibe selectors for Reels -->
             <div class="ai-vibe-pill-group" id="reelVibePills" style="display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px;">
-              <button type="button" class="ai-vibe-pill active" data-vibe="dark">💀 Dark Deep Think</button>
-              <button type="button" class="ai-vibe-pill" data-vibe="savage">🔥 Savage POV</button>
-              <button type="button" class="ai-vibe-pill" data-vibe="ironic">📺 News Satire</button>
-              <button type="button" class="ai-vibe-pill" data-vibe="existential">🖤 Existential Dread</button>
+              <button type="button" class="ai-vibe-pill active" data-vibe="dark">💀 Existential Dark</button>
+              <button type="button" class="ai-vibe-pill" data-vibe="news">📰 Breaking News</button>
+              <button type="button" class="ai-vibe-pill" data-vibe="reddit">🤖 Reddit Dilemma</button>
+              <button type="button" class="ai-vibe-pill" data-vibe="savage">🔥 Savage Reality</button>
+              <button type="button" class="ai-vibe-pill" data-vibe="collab">🎬 Collab Mashup</button>
+              <button type="button" class="ai-vibe-pill" data-vibe="brainrot">🧠 Brainrot Satire</button>
+              <button type="button" class="ai-vibe-pill" data-vibe="creator">🎙️ Podcast / VHS</button>
             </div>
             <div class="ai-suggestions-list" id="reelHooksList">
-              <div class="ai-suggest-placeholder">Select headline to generate viral Reel hooks.</div>
+              <div class="ai-suggest-placeholder">Select headline or vibe to generate viral Reel hooks.</div>
             </div>
           </div>
 
-          <!-- 4. Text Customization -->
+          <!-- 6. Text & Metadata Customization -->
           <div class="editor-section">
-            <label class="section-label">4. Customize Reel Content:</label>
+            <label class="section-label">6. Customize Reel Content & Typography:</label>
             <div class="form-group">
-              <label for="reelTopHookInput" class="form-label">Top Hook / Lead Title:</label>
-              <input type="text" id="reelTopHookInput" class="form-input" placeholder="e.g. POV: YOU CHECK THE NEWS TODAY 💀">
+              <label for="reelTopHookInput" class="form-label">Top Hook / Lead Headline:</label>
+              <input type="text" id="reelTopHookInput" class="form-input" placeholder="e.g. BREAKING: Nobody noticed this glitch in the simulation">
             </div>
             <div class="form-group">
-              <label for="reelCaptionInput" class="form-label">Main Punchline / Headline Caption:</label>
-              <textarea id="reelCaptionInput" class="form-textarea" rows="3" placeholder="Headline or viral commentary..."></textarea>
+              <label for="reelCaptionInput" class="form-label">Main Punchline / Reflection Quote:</label>
+              <textarea id="reelCaptionInput" class="form-textarea" rows="3" placeholder="Savage punchline, dark humor quote or news summary..."></textarea>
+            </div>
+            <div class="form-row-2">
+              <div class="form-group">
+                <label for="reelLocationInput" class="form-label">Source / Channel / Subreddit:</label>
+                <input type="text" id="reelLocationInput" class="form-input" placeholder="e.g. r/AskReddit • 42.8k Upvotes">
+              </div>
+              <div class="form-group">
+                <label for="reelSubBadgeInput" class="form-label">Badge / Breaking Stamp:</label>
+                <input type="text" id="reelSubBadgeInput" class="form-input" placeholder="e.g. LIVE BROADCAST 🚨">
+              </div>
             </div>
             <div class="overlay-slider-row">
-              <label for="reelDarkenSlider" class="mini-label">Video Dimming: <span id="reelDarkenVal">15</span>%</label>
+              <label for="reelDarkenSlider" class="mini-label">Video Dimming / Vignette: <span id="reelDarkenVal">15</span>%</label>
               <input type="range" id="reelDarkenSlider" min="0" max="70" value="15" class="slider-input">
             </div>
           </div>
 
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- VIRAL REEL DATASET & IDEAS CATALOG MODAL -->
+  <div class="modal-backdrop is-hidden" id="datasetModal" style="display: none !important;">
+    <div class="modal-window dataset-window">
+      <div class="modal-header">
+        <div class="modal-title-group">
+          <h2 class="modal-title">📚 Viral Reel Dataset & Pattern Catalog</h2>
+          <span class="modal-subtitle">Browse viral patterns, hooks, frames, typography & color grades from real viral reels</span>
+        </div>
+        <button id="closeDatasetBtn" class="modal-close-btn" title="Close Dataset Catalog" onclick="closeDatasetModal()">✕</button>
+      </div>
+      <div class="modal-body dataset-body">
+        <div class="dataset-filter-bar">
+          <input type="text" id="datasetSearchInput" class="search-input" placeholder="Search patterns, locations (e.g. Rishikesh, Clouds, Quote)...">
+          <div class="dataset-cat-filter" id="datasetCatFilter">
+            <button type="button" class="dcat-btn active" data-dcat="all">All (20)</button>
+            <button type="button" class="dcat-btn" data-dcat="news">📰 News & TV</button>
+            <button type="button" class="dcat-btn" data-dcat="meme">💀 Dark Memes</button>
+            <button type="button" class="dcat-btn" data-dcat="reddit">🤖 Reddit Stories</button>
+            <button type="button" class="dcat-btn" data-dcat="collab">🎬 Collab & Mashup</button>
+            <button type="button" class="dcat-btn" data-dcat="creator">🎙️ Viral Creator</button>
+          </div>
+        </div>
+        <div class="dataset-cards-grid" id="datasetCardsGrid">
+          <!-- Populated dynamically from VIRAL_REEL_DATASET -->
         </div>
       </div>
     </div>
@@ -716,6 +1020,6 @@
   <!-- Toast Container -->
   <div class="toast-container" id="toastContainer"></div>
 
-  <script src="app.js?v=11.0"></script>
+  <script src="app.js?v=16.0"></script>
 </body>
 </html>
