@@ -26,7 +26,9 @@ const state = {
     strokeColor: '#000000',
     fontSize: 36
   },
-  savedVault: JSON.parse(localStorage.getItem('ai_memer_vault') || '[]')
+  savedVault: JSON.parse(localStorage.getItem('ai_memer_vault') || '[]'),
+  selectedNewsForBatch: new Map(), // articleUrl -> article object
+  cardManualUrls: new Map() // articleUrl -> string URL
 };
 
 // DOM Elements
@@ -186,6 +188,59 @@ const elements = {
   igPublishProgressBox: document.getElementById('igPublishProgressBox'),
   igPublishProgressText: document.getElementById('igPublishProgressText'),
   igPublishResultBox: document.getElementById('igPublishResultBox'),
+
+  // Batch Reel Studio & Action Bar Elements
+  batchActionBar: document.getElementById('batchActionBar'),
+  selectAllNewsCheckbox: document.getElementById('selectAllNewsCheckbox'),
+  batchSelectedCountPill: document.getElementById('batchSelectedCountPill'),
+  batchSelectAllBtn: document.getElementById('batchSelectAllBtn'),
+  batchSelectTop5Btn: document.getElementById('batchSelectTop5Btn'),
+  batchDeselectAllBtn: document.getElementById('batchDeselectAllBtn'),
+  batchCreateReelsBtn: document.getElementById('batchCreateReelsBtn'),
+  batchBtnCountBadge: document.getElementById('batchBtnCountBadge'),
+  batchReelModal: document.getElementById('batchReelModal'),
+  closeBatchReelBtn: document.getElementById('closeBatchReelBtn'),
+  batchScreenSetup: document.getElementById('batchScreenSetup'),
+  batchScreenRunning: document.getElementById('batchScreenRunning'),
+  batchScreenSummary: document.getElementById('batchScreenSummary'),
+  batchModalCountBadge: document.getElementById('batchModalCountBadge'),
+  batchArticlesPreviewList: document.getElementById('batchArticlesPreviewList'),
+  batchVideoSourceAuto: document.getElementById('batchVideoSourceAuto'),
+  batchVideoSourceManual: document.getElementById('batchVideoSourceManual'),
+  videoSourceAutoLabel: document.getElementById('videoSourceAutoLabel'),
+  videoSourceManualLabel: document.getElementById('videoSourceManualLabel'),
+  batchManualUrlWrap: document.getElementById('batchManualUrlWrap'),
+  batchGlobalManualUrl: document.getElementById('batchGlobalManualUrl'),
+  batchPatternStrategy: document.getElementById('batchPatternStrategy'),
+  batchAutoPostIgToggle: document.getElementById('batchAutoPostIgToggle'),
+  batchIgConnectedBox: document.getElementById('batchIgConnectedBox'),
+  batchIgDisconnectedBox: document.getElementById('batchIgDisconnectedBox'),
+  batchIgUsernameLabel: document.getElementById('batchIgUsernameLabel'),
+  batchPostDelaySelect: document.getElementById('batchPostDelaySelect'),
+  startBatchWorkflowBtn: document.getElementById('startBatchWorkflowBtn'),
+  startBatchCount: document.getElementById('startBatchCount'),
+  runnerHeadlineStatus: document.getElementById('runnerHeadlineStatus'),
+  runnerCounterPill: document.getElementById('runnerCounterPill'),
+  batchOverallProgressFill: document.getElementById('batchOverallProgressFill'),
+  runnerSubtext: document.getElementById('runnerSubtext'),
+  runnerTimeText: document.getElementById('runnerTimeText'),
+  runnerCurrentCard: document.getElementById('runnerCurrentCard'),
+  currentPatternBadge: document.getElementById('currentPatternBadge'),
+  currentStoryTitle: document.getElementById('currentStoryTitle'),
+  step1Node: document.getElementById('step1Node'),
+  step2Node: document.getElementById('step2Node'),
+  step3Node: document.getElementById('step3Node'),
+  step4Node: document.getElementById('step4Node'),
+  stepLine1: document.getElementById('stepLine1'),
+  stepLine2: document.getElementById('stepLine2'),
+  stepLine3: document.getElementById('stepLine3'),
+  runnerQueueList: document.getElementById('runnerQueueList'),
+  stopBatchBtn: document.getElementById('stopBatchBtn'),
+  summaryStatsText: document.getElementById('summaryStatsText'),
+  statReelsCreated: document.getElementById('statReelsCreated'),
+  statReelsPosted: document.getElementById('statReelsPosted'),
+  statPatternsUsed: document.getElementById('statPatternsUsed'),
+  summaryGalleryGrid: document.getElementById('summaryGalleryGrid'),
   
   // Mobile Navigation & View Elements
   contentContainer: document.getElementById('contentContainer'),
@@ -264,13 +319,15 @@ function init() {
     elements.reelModal || document.getElementById('reelModal'),
     elements.vaultModal || document.getElementById('vaultModal'),
     elements.instagramModal || document.getElementById('instagramModal'),
-    elements.igPublishModal || document.getElementById('igPublishModal')
+    elements.igPublishModal || document.getElementById('igPublishModal'),
+    elements.batchReelModal || document.getElementById('batchReelModal')
   ].forEach(m => {
     if (m) hideModalElement(m);
   });
 
   updateVaultCount();
   setupEventListeners();
+  setupBatchEventListeners();
   setMobileViewMode('feed');
   loadNewsFeed();
   checkInstagramStatus();
@@ -749,9 +806,11 @@ function renderNewsCards() {
   state.clusters.forEach((cluster) => {
     const lead = cluster.main_story;
     const related = cluster.related_coverage || [];
+    lead.related_coverage = related;
+    const isSelected = state.selectedNewsForBatch.has(lead.url);
 
     const card = document.createElement('article');
-    card.className = 'news-card';
+    card.className = `news-card${isSelected ? ' card-batch-selected' : ''}`;
 
     const relatedHtml = related.length > 0 ? `
       <div class="related-coverage-wrap">
@@ -769,12 +828,24 @@ function renderNewsCards() {
       </div>
     ` : '';
 
+    const savedManualUrl = state.cardManualUrls.get(lead.url) || '';
+
     card.innerHTML = `
       <div class="news-meta-row">
-        <span class="news-publisher">${escapeHtml(lead.publisher || 'Google News')}</span>
+        <div class="news-meta-left">
+          <label class="news-card-select-label" title="Select this story for Batch Reel Studio & Instagram Auto-Post" onclick="event.stopPropagation()">
+            <input type="checkbox" class="news-card-select-cb" data-url="${escapeHtml(lead.url)}">
+            <span class="news-select-indicator"></span>
+          </label>
+          <span class="news-publisher">${escapeHtml(lead.publisher || 'Google News')}</span>
+        </div>
         <span class="news-date">${formatDate(lead.published_date)}</span>
       </div>
       <h2 class="news-title">${escapeHtml(lead.title)}</h2>
+      <div class="card-manual-url-box" onclick="event.stopPropagation()">
+        <span title="Optional custom video URL for this news">🔗</span>
+        <input type="url" class="card-manual-video-input" placeholder="Custom video URL for this story (optional)..." value="${escapeHtml(savedManualUrl)}">
+      </div>
       ${relatedHtml}
       <div class="news-card-actions">
         <div class="card-actions-left">
@@ -794,6 +865,27 @@ function renderNewsCards() {
         </a>
       </div>
     `;
+
+    // Checkbox Listener
+    const cb = card.querySelector('.news-card-select-cb');
+    cb.checked = isSelected;
+    cb.addEventListener('change', (e) => {
+      e.stopPropagation();
+      toggleArticleBatchSelection(lead, cb.checked);
+      card.classList.toggle('card-batch-selected', cb.checked);
+    });
+
+    // Manual Video URL input listener
+    const manualInput = card.querySelector('.card-manual-video-input');
+    if (manualInput) {
+      manualInput.addEventListener('input', (e) => {
+        const val = manualInput.value.trim();
+        state.cardManualUrls.set(lead.url, val);
+        if (state.selectedNewsForBatch.has(lead.url)) {
+          state.selectedNewsForBatch.get(lead.url).manualVideoUrl = val;
+        }
+      });
+    }
 
     // Event Listeners for Card
     const photoBtn = card.querySelector('.photo-meme-btn');
@@ -832,6 +924,7 @@ function renderNewsCards() {
 
     elements.newsGrid.appendChild(card);
   });
+  updateBatchSelectionUI();
 }
 
 function selectArticle(article, withPhoto = false) {
@@ -1469,46 +1562,66 @@ function drawDrakeStyleTemplate(w, h) {
 }
 
 /* Helper Text Drawing Functions */
-function wrapText(context, text, x, y, maxWidth, lineHeight) {
-  if (!text) return;
+function wrapText(context, text, x, y, maxWidth, lineHeight, maxLines = 10) {
+  if (!text) return y;
   const words = text.split(' ');
   let line = '';
+  let curY = y;
+  let linesDrawn = 0;
 
   for (let n = 0; n < words.length; n++) {
     const testLine = line + words[n] + ' ';
     const metrics = context.measureText(testLine);
     const testWidth = metrics.width;
     if (testWidth > maxWidth && n > 0) {
-      context.fillText(line.trim(), x, y);
+      context.fillText(line.trim(), x, curY);
       line = words[n] + ' ';
-      y += lineHeight;
+      curY += lineHeight;
+      linesDrawn++;
+      if (linesDrawn >= maxLines) {
+        return curY;
+      }
     } else {
       line = testLine;
     }
   }
-  context.fillText(line.trim(), x, y);
+  if (line.trim()) {
+    context.fillText(line.trim(), x, curY);
+    curY += lineHeight;
+  }
+  return curY;
 }
 
-function drawStrokedText(context, text, x, y, maxWidth, lineHeight) {
-  if (!text) return;
+function drawStrokedText(context, text, x, y, maxWidth, lineHeight, maxLines = 10) {
+  if (!text) return y;
   const words = text.split(' ');
   let line = '';
+  let curY = y;
+  let linesDrawn = 0;
 
   for (let n = 0; n < words.length; n++) {
     const testLine = line + words[n] + ' ';
     const metrics = context.measureText(testLine);
     const testWidth = metrics.width;
     if (testWidth > maxWidth && n > 0) {
-      context.strokeText(line.trim(), x, y);
-      context.fillText(line.trim(), x, y);
+      context.strokeText(line.trim(), x, curY);
+      context.fillText(line.trim(), x, curY);
       line = words[n] + ' ';
-      y += lineHeight;
+      curY += lineHeight;
+      linesDrawn++;
+      if (linesDrawn >= maxLines) {
+        return curY;
+      }
     } else {
       line = testLine;
     }
   }
-  context.strokeText(line.trim(), x, y);
-  context.fillText(line.trim(), x, y);
+  if (line.trim()) {
+    context.strokeText(line.trim(), x, curY);
+    context.fillText(line.trim(), x, curY);
+    curY += lineHeight;
+  }
+  return curY;
 }
 
 function roundRect(ctx, x, y, width, height, radius) {
@@ -2399,7 +2512,7 @@ async function fetchRelatedVideoFromInternet() {
     return;
   }
 
-  setVideoStatus(`🔍 Searching Internet for related video footage...`, 'loading');
+  setVideoStatus(`🔍 Searching Internet for related news footage & CCTV...`, 'loading');
   if (elements.autoSearchVideoBtn) {
     elements.autoSearchVideoBtn.disabled = true;
     elements.autoSearchVideoBtn.textContent = 'Searching...';
@@ -2409,7 +2522,11 @@ async function fetchRelatedVideoFromInternet() {
     const res = await fetch('/api/fetch-reel-video', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ type: 'search', query })
+      body: JSON.stringify({
+        type: 'search',
+        query,
+        search_queries: reelState.searchQueries || []
+      })
     });
     const data = await res.json();
 
@@ -2420,7 +2537,7 @@ async function fetchRelatedVideoFromInternet() {
         elements.reelHdQualityBadge.style.display = 'inline-flex';
       }
       loadVideoSource(data.videoUrl, data.title || 'Related Video Footage');
-      showToast('✨ Found and downloaded related HD video footage!', 'success');
+      showToast('✨ Found and downloaded relatable HD video footage!', 'success');
     } else {
       throw new Error(data.error || 'No video footage found for this query');
     }
@@ -2441,11 +2558,12 @@ async function fetchReelAiHooks() {
   if (!elements.reelHooksList) return;
   const headline = state.selectedArticle?.title || reelState.caption || 'Today\'s Major Headline';
   const publisher = state.selectedArticle?.publisher || 'News Agency';
-  const vibe = reelState.vibe || 'dark';
+  const vibe = reelState.vibe || 'news';
+  const relatedCoverage = state.selectedArticle?.related_coverage || [];
 
   elements.reelHooksList.innerHTML = `<div class="ai-suggest-placeholder">
     <div class="spinner" style="width: 20px; height: 20px; margin: 0 auto 8px;"></div>
-    ⚡ Groq AI cooking viral 9:16 Reel hooks...
+    ⚡ Groq AI synthesizing breaking headline & 2-3 line description...
   </div>`;
 
   try {
@@ -2456,17 +2574,30 @@ async function fetchReelAiHooks() {
         title: headline,
         publisher: publisher,
         category: state.currentTopic || state.currentType || '',
-        vibe: vibe
+        vibe: vibe,
+        related_coverage: relatedCoverage
       })
     });
     const data = await res.json();
+
+    if (data.headline) {
+      reelState.topHook = data.headline;
+      if (elements.reelTopHookInput) elements.reelTopHookInput.value = data.headline;
+    }
+    if (data.description) {
+      reelState.caption = data.description;
+      if (elements.reelCaptionInput) elements.reelCaptionInput.value = data.description;
+    }
+    if (data.search_queries && Array.isArray(data.search_queries)) {
+      reelState.searchQueries = data.search_queries;
+    }
 
     if (data.hooks && data.hooks.length > 0) {
       elements.reelHooksList.innerHTML = '';
       data.hooks.forEach(item => {
         const card = document.createElement('div');
         card.className = 'ai-suggest-card';
-        const badge = item.vibe || '🔥 VIRAL REEL HOOK';
+        const badge = item.vibe || '🔴 BREAKING NEWS';
         const formatName = (item.layout || 'reel_split').replace('reel_', '');
         card.innerHTML = `
           <div class="suggest-angle-badge">${escapeHtml(badge)} • ${escapeHtml(formatName.toUpperCase())}</div>
@@ -2487,7 +2618,7 @@ async function fetchReelAiHooks() {
           }
           if (elements.reelTopHookInput) elements.reelTopHookInput.value = item.top_hook;
           if (elements.reelCaptionInput) elements.reelCaptionInput.value = item.caption;
-          showToast('Applied Groq viral hook to Reel!', 'success');
+          showToast('Applied breaking news hook to Reel!', 'success');
         });
 
         elements.reelHooksList.appendChild(card);
@@ -3051,43 +3182,70 @@ function drawReelHeadlineReactionLayout(targetCtx, w, h, vid, hasVideo, topHook,
   wrapText(ctx, caption, w / 2, botY + 50 * s, w - 90 * s, 30 * s);
 }
 
-/* Layout 6: Existential Dark Meme */
+/* Layout 6: Existential Dark Meme / High-Impact News Reel */
 function drawReelDarkHumorLayout(targetCtx, w, h, vid, hasVideo, topHook, caption, publisher, overlayOnly = false) {
   const ctx = targetCtx || reelCtx;
   const s = w / 720;
   if (!overlayOnly) drawReelVideoBg(ctx, w, h, vid, hasVideo);
 
-  // Obsidian Dark Dim
-  ctx.fillStyle = 'rgba(0, 0, 0, 0.55)';
+  // Subtle dark vignette over video
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.45)';
   ctx.fillRect(0, 0, w, h);
 
-  // Top Toxic Pill
-  ctx.fillStyle = 'rgba(22, 101, 52, 0.9)';
-  roundRect(ctx, 40 * s, 60 * s, 200 * s, 36 * s, 18 * s);
+  // Sleek Glassmorphic Breaking News Card in Center
+  const cardW = w - 60 * s;
+  const cardX = 30 * s;
+  const cardY = h / 2 - 220 * s;
+  const cardH = 460 * s;
+
+  // Dark glass backing
+  ctx.fillStyle = 'rgba(10, 15, 29, 0.92)';
+  roundRect(ctx, cardX, cardY, cardW, cardH, 24 * s);
   ctx.fill();
-  ctx.fillStyle = '#4ade80';
-  ctx.font = `800 ${Math.round(13 * s)}px "Outfit", sans-serif`;
-  ctx.textAlign = 'center';
-  ctx.fillText('💀 EXISTENTIAL DREAD', 140 * s, 83 * s);
 
-  // Central Dark Meme Quote (High Contrast White Stroked Font)
-  ctx.shadowColor = 'rgba(0, 0, 0, 0.95)';
-  ctx.shadowBlur = 20 * s;
+  ctx.strokeStyle = 'rgba(239, 68, 68, 0.45)';
+  ctx.lineWidth = 2 * s;
+  roundRect(ctx, cardX, cardY, cardW, cardH, 24 * s);
+  ctx.stroke();
+
+  // Top Badge Row
+  ctx.fillStyle = '#ef4444';
+  roundRect(ctx, cardX + 28 * s, cardY + 24 * s, 175 * s, 34 * s, 17 * s);
+  ctx.fill();
   ctx.fillStyle = '#ffffff';
-  ctx.font = `900 ${Math.round(36 * s)}px "Outfit", sans-serif`;
+  ctx.font = `bold ${Math.round(13 * s)}px "Plus Jakarta Sans", sans-serif`;
   ctx.textAlign = 'center';
-  wrapText(ctx, `"${topHook}"`, w / 2, h / 2 - 50 * s, w - 80 * s, 46 * s);
-  ctx.shadowColor = 'transparent';
+  ctx.fillText('🔴 BREAKING NEWS', cardX + 115 * s, cardY + 46 * s);
 
-  // Sarcastic / Nihilistic Subtitle
-  ctx.fillStyle = '#a7f3d0';
-  ctx.font = `600 ${Math.round(22 * s)}px "Plus Jakarta Sans", sans-serif`;
-  wrapText(ctx, caption, w / 2, h / 2 + 90 * s, w - 100 * s, 30 * s);
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.12)';
+  roundRect(ctx, cardX + 215 * s, cardY + 24 * s, 190 * s, 34 * s, 17 * s);
+  ctx.fill();
+  ctx.fillStyle = '#cbd5e1';
+  ctx.font = `bold ${Math.round(12 * s)}px "Plus Jakarta Sans", sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.fillText(`⚡ ${(publisher || 'GLOBAL DESK').slice(0, 18).toUpperCase()}`, cardX + 310 * s, cardY + 46 * s);
+
+  // 1. Full News Headline (Prominent, 2 to 3 lines)
+  ctx.fillStyle = '#ffffff';
+  ctx.font = `900 ${Math.round(28 * s)}px "Outfit", sans-serif`;
+  ctx.textAlign = 'left';
+  const headEndY = wrapText(ctx, topHook, cardX + 28 * s, cardY + 105 * s, cardW - 56 * s, 38 * s, 3);
+
+  // Subtle separator line
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.15)';
+  ctx.fillRect(cardX + 28 * s, headEndY + 4 * s, cardW - 56 * s, 1.5 * s);
+
+  // 2. 2-3 Line Factual News Description
+  ctx.fillStyle = '#e2e8f0';
+  ctx.font = `500 ${Math.round(19 * s)}px "Plus Jakarta Sans", sans-serif`;
+  ctx.textAlign = 'left';
+  wrapText(ctx, caption, cardX + 28 * s, headEndY + 32 * s, cardW - 56 * s, 27 * s, 4);
 
   // Footer Tag
-  ctx.fillStyle = '#64748b';
-  ctx.font = `500 ${Math.round(15 * s)}px "Plus Jakarta Sans", sans-serif`;
-  ctx.fillText('Nothing matters anyway • Tap to save', w / 2, h - 50 * s);
+  ctx.fillStyle = '#94a3b8';
+  ctx.font = `600 ${Math.round(13 * s)}px "Plus Jakarta Sans", sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.fillText('⚡ Real-Time Global Updates • Follow for More', w / 2, cardY + cardH - 24 * s);
 }
 
 /* Layout 7: Simulation Glitch / Error 404 */
@@ -3105,85 +3263,89 @@ function drawReelSimulationGlitchLayout(targetCtx, w, h, vid, hasVideo, topHook,
   // Glitch Alert Card
   const gY = 80 * s;
   ctx.fillStyle = 'rgba(10, 10, 25, 0.95)';
-  roundRect(ctx, 30 * s, gY, w - 60 * s, 220 * s, 16 * s);
+  roundRect(ctx, 30 * s, gY, w - 60 * s, 260 * s, 16 * s);
   ctx.fill();
   ctx.strokeStyle = '#06b6d4';
   ctx.lineWidth = 2 * s;
-  roundRect(ctx, 30 * s, gY, w - 60 * s, 220 * s, 16 * s);
+  roundRect(ctx, 30 * s, gY, w - 60 * s, 260 * s, 16 * s);
   ctx.stroke();
 
   // Glitch Error Badge
   ctx.fillStyle = '#06b6d4';
-  roundRect(ctx, 50 * s, gY + 20 * s, 170 * s, 32 * s, 8 * s);
+  roundRect(ctx, 50 * s, gY + 20 * s, 180 * s, 32 * s, 8 * s);
   ctx.fill();
   ctx.fillStyle = '#082f49';
   ctx.font = `800 ${Math.round(13 * s)}px monospace`;
   ctx.textAlign = 'center';
-  ctx.fillText('ERR: MATRIX_GLITCH', 135 * s, gY + 41 * s);
+  ctx.fillText('ERR: BREAKING_REPORT', 140 * s, gY + 41 * s);
 
-  // Glitch Text RGB Shift
+  // Glitch Text RGB Shift (Full Headline)
   ctx.textAlign = 'left';
-  ctx.font = `800 ${Math.round(28 * s)}px "Outfit", sans-serif`;
+  ctx.font = `800 ${Math.round(27 * s)}px "Outfit", sans-serif`;
   ctx.fillStyle = 'rgba(239, 68, 68, 0.8)';
-  wrapText(ctx, topHook, 52 * s, gY + 92 * s, w - 100 * s, 36 * s);
+  wrapText(ctx, topHook, 52 * s, gY + 92 * s, w - 100 * s, 35 * s, 3);
   ctx.fillStyle = '#ffffff';
-  wrapText(ctx, topHook, 50 * s, gY + 90 * s, w - 100 * s, 36 * s);
+  wrapText(ctx, topHook, 50 * s, gY + 90 * s, w - 100 * s, 35 * s, 3);
 
-  // Explanation Punchline
-  const bY = h - 220 * s;
-  ctx.fillStyle = 'rgba(10, 10, 25, 0.9)';
-  roundRect(ctx, 30 * s, bY, w - 60 * s, 140 * s, 16 * s);
+  // Explanation Punchline / 2-3 Line Description
+  const bY = h - 240 * s;
+  ctx.fillStyle = 'rgba(10, 10, 25, 0.92)';
+  roundRect(ctx, 30 * s, bY, w - 60 * s, 160 * s, 16 * s);
   ctx.fill();
   ctx.fillStyle = '#38bdf8';
   ctx.font = `600 ${Math.round(14 * s)}px monospace`;
-  ctx.fillText('// SIMULATION STATUS REPORT', 50 * s, bY + 36 * s);
+  ctx.fillText('// DEVELOPING STORY DETAILS', 50 * s, bY + 34 * s);
   ctx.fillStyle = '#e2e8f0';
-  ctx.font = `500 ${Math.round(20 * s)}px "Plus Jakarta Sans", sans-serif`;
-  wrapText(ctx, caption, 50 * s, bY + 74 * s, w - 100 * s, 28 * s);
+  ctx.font = `500 ${Math.round(19 * s)}px "Plus Jakarta Sans", sans-serif`;
+  wrapText(ctx, caption, 50 * s, bY + 70 * s, w - 100 * s, 26 * s, 3);
 }
 
 /* Layout 8: Split-Screen News Card */
 function drawReelSplitLayout(targetCtx, w, h, vid, hasVideo, topHook, caption, publisher, overlayOnly = false) {
   const ctx = targetCtx || reelCtx;
   const s = w / 720;
-  const cardH = 500 * s;
+  const cardH = 540 * s;
 
   // 1. Top Card Background
   ctx.fillStyle = '#ffffff';
   ctx.fillRect(0, 0, w, cardH);
 
   // Top Tag & Publisher Row
-  ctx.fillStyle = '#ef4444';
-  roundRect(ctx, 40 * s, 45 * s, 175 * s, 34 * s, 17 * s);
+  ctx.fillStyle = '#dc2626';
+  roundRect(ctx, 40 * s, 42 * s, 180 * s, 34 * s, 17 * s);
   ctx.fill();
 
   ctx.fillStyle = '#ffffff';
   ctx.font = `bold ${Math.round(14 * s)}px "Plus Jakarta Sans", sans-serif`;
   ctx.textAlign = 'center';
-  ctx.fillText('🔴 BREAKING NEWS', 127 * s, 68 * s);
+  ctx.fillText('🔴 BREAKING NEWS', 130 * s, 65 * s);
 
   ctx.fillStyle = '#f1f5f9';
-  roundRect(ctx, 225 * s, 45 * s, 190 * s, 34 * s, 17 * s);
+  roundRect(ctx, 230 * s, 42 * s, 190 * s, 34 * s, 17 * s);
   ctx.fill();
 
   ctx.fillStyle = '#475569';
   ctx.font = `bold ${Math.round(13 * s)}px "Plus Jakarta Sans", sans-serif`;
   ctx.textAlign = 'center';
-  ctx.fillText(`⚡ ${publisher.slice(0, 16).toUpperCase()}`, 320 * s, 68 * s);
+  ctx.fillText(`⚡ ${(publisher || 'GLOBAL NEWS').slice(0, 18).toUpperCase()}`, 325 * s, 65 * s);
 
-  // Top Hook
+  // 1. Full Headline (prominent, 2 to 3 lines)
   ctx.fillStyle = '#0f172a';
-  ctx.font = `900 ${Math.round(36 * s)}px "Outfit", sans-serif`;
+  ctx.font = `900 ${Math.round(30 * s)}px "Outfit", sans-serif`;
   ctx.textAlign = 'left';
-  wrapText(ctx, topHook, 40 * s, 135 * s, w - 80 * s, 44 * s);
+  const headEndY = wrapText(ctx, topHook, 40 * s, 122 * s, w - 80 * s, 38 * s, 3);
 
-  // Caption
+  // Subtle separator line
+  ctx.fillStyle = 'rgba(226, 232, 240, 0.85)';
+  ctx.fillRect(40 * s, headEndY + 4 * s, w - 80 * s, 2 * s);
+
+  // 2. 2-3 Line Factual News Description
   ctx.fillStyle = '#334155';
-  ctx.font = `600 ${Math.round(23 * s)}px "Plus Jakarta Sans", sans-serif`;
+  ctx.font = `500 ${Math.round(20 * s)}px "Plus Jakarta Sans", sans-serif`;
   ctx.textAlign = 'left';
-  wrapText(ctx, caption, 40 * s, 280 * s, w - 80 * s, 34 * s);
+  wrapText(ctx, caption, 40 * s, headEndY + 32 * s, w - 80 * s, 28 * s, 3);
 
-  // Sleek Divider
+  // Sleek Divider between card and video
   const grad = ctx.createLinearGradient(0, cardH - 4 * s, w, cardH + 4 * s);
   grad.addColorStop(0, '#f43f5e');
   grad.addColorStop(0.5, '#8b5cf6');
@@ -3225,7 +3387,7 @@ function drawReelChyronLayout(targetCtx, w, h, vid, hasVideo, topHook, caption, 
   ctx.fillText('🔴 LIVE', 95 * s, 85 * s);
 
   ctx.fillStyle = 'rgba(15, 23, 42, 0.85)';
-  roundRect(ctx, 160 * s, 60 * s, 200 * s, 38 * s, 8 * s);
+  roundRect(ctx, 160 * s, 60 * s, 210 * s, 38 * s, 8 * s);
   ctx.fill();
 
   ctx.fillStyle = '#f8fafc';
@@ -3233,44 +3395,44 @@ function drawReelChyronLayout(targetCtx, w, h, vid, hasVideo, topHook, caption, 
   ctx.textAlign = 'left';
   ctx.fillText('GLOBAL REEL FEED', 175 * s, 85 * s);
 
-  // Top Hook Overlay with Shadow
+  // Top Hook Overlay with Shadow (Headline)
   ctx.shadowColor = 'rgba(0, 0, 0, 0.9)';
-  ctx.shadowBlur = 12 * s;
+  ctx.shadowBlur = 14 * s;
   ctx.fillStyle = '#ffffff';
-  ctx.font = `900 ${Math.round(36 * s)}px "Outfit", sans-serif`;
+  ctx.font = `900 ${Math.round(30 * s)}px "Outfit", sans-serif`;
   ctx.textAlign = 'center';
-  wrapText(ctx, topHook, w / 2, 170 * s, w - 80 * s, 44 * s);
+  wrapText(ctx, topHook, w / 2, 160 * s, w - 80 * s, 38 * s, 3);
   ctx.shadowColor = 'transparent';
 
   // Lower Third Chyron
-  const chyronY = h - 300 * s;
+  const chyronY = h - 350 * s;
 
   // Red Header Bar
   ctx.fillStyle = '#dc2626';
-  ctx.fillRect(0, chyronY, w, 54 * s);
+  ctx.fillRect(0, chyronY, w, 52 * s);
 
   ctx.fillStyle = '#ffffff';
-  ctx.font = `900 ${Math.round(30 * s)}px "Outfit", Impact, sans-serif`;
+  ctx.font = `900 ${Math.round(26 * s)}px "Outfit", Impact, sans-serif`;
   ctx.textAlign = 'left';
-  ctx.fillText('⚡ BREAKING NEWS', 40 * s, chyronY + 38 * s);
+  ctx.fillText(`⚡ BREAKING NEWS: ${(publisher || 'WORLD DESK').toUpperCase()}`, 40 * s, chyronY + 36 * s);
 
-  // Navy Headline Container
+  // Navy Headline Container (fits 2-3 lines of description)
   ctx.fillStyle = 'rgba(15, 23, 42, 0.94)';
-  ctx.fillRect(0, chyronY + 54 * s, w, 150 * s);
+  ctx.fillRect(0, chyronY + 52 * s, w, 190 * s);
 
   ctx.fillStyle = '#f8fafc';
-  ctx.font = `bold ${Math.round(25 * s)}px "Plus Jakarta Sans", sans-serif`;
+  ctx.font = `500 ${Math.round(21 * s)}px "Plus Jakarta Sans", sans-serif`;
   ctx.textAlign = 'left';
-  wrapText(ctx, caption, 40 * s, chyronY + 100 * s, w - 80 * s, 35 * s);
+  wrapText(ctx, caption, 40 * s, chyronY + 95 * s, w - 80 * s, 30 * s, 3);
 
   // Animated Scrolling Bottom Ticker
-  const tickerY = chyronY + 204 * s;
+  const tickerY = chyronY + 242 * s;
   ctx.fillStyle = '#b91c1c';
   ctx.fillRect(0, tickerY, w, 50 * s);
 
   const tickerText = `🚨 DEVELOPING STORY • ${caption} • LIVE WORLD BROADCAST • FOLLOW FOR MORE REELS 🚨`;
   ctx.fillStyle = '#ffffff';
-  ctx.font = `bold ${Math.round(18 * s)}px "Plus Jakarta Sans", sans-serif`;
+  ctx.font = `bold ${Math.round(17 * s)}px "Plus Jakarta Sans", sans-serif`;
   ctx.textAlign = 'left';
   ctx.fillText(tickerText, 40 * s - (reelState.tickerOffset % 900), tickerY + 32 * s);
 }
@@ -4031,9 +4193,10 @@ function drawReelSavageRealityLayout(targetCtx, w, h, vid, hasVideo, topHook, ca
   wrapText(ctx, caption, w / 2, bY + 62 * s, w - 90 * s, 28 * s);
 }
 
-function renderSelectedLayout(ctx, w, h, vid, hasVideo, topHook, caption, publisher, overlayOnly = false) {
+function renderSelectedLayout(ctx, w, h, vid, hasVideo, topHook, caption, publisher, overlayOnly = false, layoutOverride = null) {
   try {
-  switch (reelState.layout) {
+  const activeLayout = layoutOverride || reelState.layout;
+  switch (activeLayout) {
     case 'reel_split':
       drawReelSplitLayout(ctx, w, h, vid, hasVideo, topHook, caption, publisher, overlayOnly);
       break;
@@ -4135,8 +4298,8 @@ function drawVideoPlaceholder(targetCtx, x, y, w, h) {
 }
 
 // Generate transparent overlay PNG (1080x1920 Full HD or 720x1280 Fast HD)
-function getReelOverlayDataUrl() {
-  const is1080 = reelState.quality === 'hd1080';
+function getReelOverlayDataUrl(customData = null) {
+  const is1080 = (customData?.quality || reelState.quality) === 'hd1080';
   const w = is1080 ? 1080 : 720;
   const h = is1080 ? 1920 : 1280;
 
@@ -4146,11 +4309,12 @@ function getReelOverlayDataUrl() {
   const ctx = offCanvas.getContext('2d');
   ctx.clearRect(0, 0, w, h);
 
-  const topHook = reelState.topHook || 'BREAKING: Nobody noticed this glitch in the simulation';
-  const caption = reelState.caption || state.selectedArticle?.title || 'When the truth hits harder than your morning coffee.';
-  const publisher = state.selectedArticle?.publisher || 'TODAY MEMER';
+  const topHook = customData?.topHook || reelState.topHook || 'BREAKING: Nobody noticed this glitch in the simulation';
+  const caption = customData?.caption || reelState.caption || state.selectedArticle?.title || 'When the truth hits harder than your morning coffee.';
+  const publisher = customData?.publisher || state.selectedArticle?.publisher || 'TODAY MEMER';
+  const layout = customData?.layout || reelState.layout;
 
-  renderSelectedLayout(ctx, w, h, null, false, topHook, caption, publisher, true);
+  renderSelectedLayout(ctx, w, h, null, false, topHook, caption, publisher, true, layout);
   return offCanvas.toDataURL('image/png');
 }
 
@@ -4893,6 +5057,685 @@ async function executeInstagramPublish() {
   }
 }
 
+/* ==========================================================================
+   BATCH REEL STUDIO & 1-CLICK INSTAGRAM AUTO-POST WORKFLOW
+   ========================================================================== */
+const BATCH_PATTERNS = [
+  'reel_split',
+  'reel_chyron',
+  'reel_unusual_whales',
+  'reel_dark_humor',
+  'reel_fake_notification',
+  'reel_tweet_dark',
+  'reel_simulation_glitch',
+  'reel_reddit_story',
+  'reel_savage_reality',
+  'reel_headline_reaction',
+  'reel_retro_vhs',
+  'reel_neon_cyberpunk',
+  'reel_reddit_confession',
+  'reel_reddit_aita',
+  'reel_brainrot_subway',
+  'reel_podcast_clip',
+  'reel_before_after',
+  'reel_impact'
+];
+
+const batchState = {
+  isRunning: false,
+  queue: [],
+  currentIndex: 0,
+  results: [],
+  timerInterval: null,
+  startTime: 0
+};
+
+function formatPatternName(layout) {
+  const map = {
+    'reel_split': 'Split Breaking News',
+    'reel_chyron': 'Live TV Chyron',
+    'reel_unusual_whales': 'Unusual Whales Alert',
+    'reel_fake_notification': 'Viral Push Notification',
+    'reel_dark_humor': 'Existential Dark Meme',
+    'reel_simulation_glitch': 'Simulation Glitch Matrix',
+    'reel_tweet_dark': 'OLED Dark Mode Tweet',
+    'reel_savage_reality': 'Savage Reality Check',
+    'reel_reddit_story': 'r/AskReddit Storytime',
+    'reel_reddit_confession': 'r/Confession Secrets',
+    'reel_reddit_aita': 'r/AITA Drama Story',
+    'reel_headline_reaction': 'Headline Reaction Collab',
+    'reel_retro_vhs': 'Retro 90s VHS Camcorder',
+    'reel_neon_cyberpunk': 'Cyberpunk Neon HUD',
+    'reel_brainrot_subway': 'Brainrot Subway Collab',
+    'reel_podcast_clip': 'Podcast Wisdom Highlight',
+    'reel_before_after': 'Expectation vs Reality',
+    'reel_impact': 'Impact Meme Classic'
+  };
+  return map[layout] || 'Split Breaking News';
+}
+
+function extractSearchKeywords(title) {
+  if (!title) return 'breaking news footage 4k';
+  const clean = title.replace(/[^\w\s]/g, ' ');
+  const stopWords = new Set(['the', 'and', 'for', 'with', 'from', 'that', 'this', 'after', 'into', 'over', 'says', 'said', 'will', 'what', 'when', 'where', 'how', 'today', 'news', 'amid', 'first', 'about']);
+  const words = clean.split(/\s+/).filter(w => w.length > 2 && !stopWords.has(w.toLowerCase()));
+  return words.slice(0, 4).join(' ') || title.slice(0, 30);
+}
+
+function getPatternForIndex(strategy, idx) {
+  if (!strategy || strategy === 'cycle') {
+    return BATCH_PATTERNS[idx % BATCH_PATTERNS.length];
+  }
+  if (strategy === 'random') {
+    return BATCH_PATTERNS[Math.floor(Math.random() * BATCH_PATTERNS.length)];
+  }
+  return strategy;
+}
+
+function toggleArticleBatchSelection(article, isSelected) {
+  if (!article || !article.url) return;
+  if (isSelected) {
+    const customUrl = state.cardManualUrls.get(article.url) || '';
+    state.selectedNewsForBatch.set(article.url, {
+      ...article,
+      manualVideoUrl: customUrl,
+      related_coverage: article.related_coverage || []
+    });
+  } else {
+    state.selectedNewsForBatch.delete(article.url);
+  }
+  updateBatchSelectionUI();
+}
+
+function selectAllNews(shouldSelect = true) {
+  if (shouldSelect) {
+    state.clusters.forEach(cluster => {
+      if (cluster && cluster.main_story) {
+        const lead = cluster.main_story;
+        const customUrl = state.cardManualUrls.get(lead.url) || '';
+        state.selectedNewsForBatch.set(lead.url, {
+          ...lead,
+          manualVideoUrl: customUrl,
+          related_coverage: cluster.related_coverage || lead.related_coverage || []
+        });
+      }
+    });
+  } else {
+    state.selectedNewsForBatch.clear();
+  }
+
+  // Sync all DOM checkboxes & cards
+  const checkboxes = document.querySelectorAll('.news-card-select-cb');
+  checkboxes.forEach(cb => {
+    cb.checked = shouldSelect;
+    const card = cb.closest('.news-card');
+    if (card) card.classList.toggle('card-batch-selected', shouldSelect);
+  });
+
+  updateBatchSelectionUI();
+}
+
+function selectTopNNews(n = 5) {
+  state.selectedNewsForBatch.clear();
+  const subset = state.clusters.slice(0, n);
+  const selectedUrls = new Set();
+  subset.forEach(cluster => {
+    if (cluster && cluster.main_story) {
+      const lead = cluster.main_story;
+      selectedUrls.add(lead.url);
+      const customUrl = state.cardManualUrls.get(lead.url) || '';
+      state.selectedNewsForBatch.set(lead.url, {
+        ...lead,
+        manualVideoUrl: customUrl,
+        related_coverage: cluster.related_coverage || lead.related_coverage || []
+      });
+    }
+  });
+
+  // Sync checkboxes in DOM
+  const checkboxes = document.querySelectorAll('.news-card-select-cb');
+  checkboxes.forEach(cb => {
+    const isChecked = selectedUrls.has(cb.dataset.url);
+    cb.checked = isChecked;
+    const card = cb.closest('.news-card');
+    if (card) card.classList.toggle('card-batch-selected', isChecked);
+  });
+
+  updateBatchSelectionUI();
+}
+
+function updateBatchSelectionUI() {
+  const count = state.selectedNewsForBatch.size;
+  const total = state.clusters.length;
+
+  if (elements.batchSelectedCountPill) {
+    elements.batchSelectedCountPill.textContent = `${count} selected`;
+    elements.batchSelectedCountPill.classList.toggle('has-selection', count > 0);
+  }
+
+  if (elements.batchBtnCountBadge) {
+    elements.batchBtnCountBadge.textContent = count;
+    elements.batchBtnCountBadge.style.display = count > 0 ? 'inline-block' : 'none';
+  }
+
+  if (elements.selectAllNewsCheckbox) {
+    elements.selectAllNewsCheckbox.checked = total > 0 && count === total;
+    elements.selectAllNewsCheckbox.indeterminate = count > 0 && count < total;
+  }
+
+  if (elements.batchModalCountBadge) {
+    elements.batchModalCountBadge.textContent = `${count} Stories Selected`;
+  }
+
+  if (elements.startBatchCount) {
+    elements.startBatchCount.textContent = count;
+  }
+}
+
+function openBatchReelModal() {
+  // If nothing selected, auto-select top 5 stories as smart convenience
+  if (state.selectedNewsForBatch.size === 0 && state.clusters.length > 0) {
+    selectTopNNews(Math.min(5, state.clusters.length));
+    showToast('Auto-selected top 5 news stories for batch reel creation', 'info');
+  }
+
+  if (state.selectedNewsForBatch.size === 0) {
+    showToast('Please wait for news feeds to load or select articles first.', 'warning');
+    return;
+  }
+
+  // Reset to Screen 1 (Setup)
+  if (elements.batchScreenSetup) elements.batchScreenSetup.style.display = 'block';
+  if (elements.batchScreenRunning) elements.batchScreenRunning.style.display = 'none';
+  if (elements.batchScreenSummary) elements.batchScreenSummary.style.display = 'none';
+
+  updateBatchSelectionUI();
+  renderBatchArticlesPreview();
+  updateBatchIgStatusUI();
+
+  if (elements.batchReelModal) {
+    showModalElement(elements.batchReelModal);
+  }
+}
+
+function closeBatchReelModal() {
+  if (batchState.isRunning) {
+    const ok = confirm('A batch reel creation workflow is currently in progress. Stop and close?');
+    if (!ok) return;
+    stopBatchWorkflow();
+  }
+  if (elements.batchReelModal) {
+    hideModalElement(elements.batchReelModal);
+  }
+}
+
+function updateBatchIgStatusUI() {
+  if (elements.batchIgConnectedBox && elements.batchIgDisconnectedBox) {
+    if (igState.connected) {
+      elements.batchIgConnectedBox.style.display = 'flex';
+      elements.batchIgDisconnectedBox.style.display = 'none';
+      if (elements.batchIgUsernameLabel) {
+        elements.batchIgUsernameLabel.textContent = `@${igState.username || 'connected'}`;
+      }
+    } else {
+      elements.batchIgConnectedBox.style.display = 'none';
+      elements.batchIgDisconnectedBox.style.display = 'block';
+    }
+  }
+}
+
+function renderBatchArticlesPreview() {
+  if (!elements.batchArticlesPreviewList) return;
+  elements.batchArticlesPreviewList.innerHTML = '';
+
+  const strategy = elements.batchPatternStrategy?.value || 'cycle';
+  let idx = 0;
+
+  state.selectedNewsForBatch.forEach(article => {
+    const pattern = getPatternForIndex(strategy, idx);
+    const chip = document.createElement('div');
+    chip.className = 'batch-article-chip';
+    chip.innerHTML = `
+      <div class="batch-chip-meta">
+        <span class="batch-chip-source">${escapeHtml(article.publisher || 'News')}</span>
+        <span class="batch-chip-pattern">🎬 ${formatPatternName(pattern)}</span>
+      </div>
+      <div class="batch-chip-title">${escapeHtml(article.title)}</div>
+    `;
+    elements.batchArticlesPreviewList.appendChild(chip);
+    idx++;
+  });
+}
+
+function setupBatchEventListeners() {
+  // Select All Checkbox in action bar
+  if (elements.selectAllNewsCheckbox) {
+    elements.selectAllNewsCheckbox.addEventListener('change', (e) => {
+      selectAllNews(e.target.checked);
+    });
+  }
+
+  // Quick Action Buttons
+  if (elements.batchSelectAllBtn) {
+    elements.batchSelectAllBtn.addEventListener('click', () => selectAllNews(true));
+  }
+  if (elements.batchSelectTop5Btn) {
+    elements.batchSelectTop5Btn.addEventListener('click', () => selectTopNNews(5));
+  }
+  if (elements.batchDeselectAllBtn) {
+    elements.batchDeselectAllBtn.addEventListener('click', () => selectAllNews(false));
+  }
+
+  // Open modal button
+  if (elements.batchCreateReelsBtn) {
+    elements.batchCreateReelsBtn.addEventListener('click', openBatchReelModal);
+  }
+
+  // Close modal button
+  if (elements.closeBatchReelBtn) {
+    elements.closeBatchReelBtn.addEventListener('click', closeBatchReelModal);
+  }
+
+  // Radio toggles for video source
+  const autoRadio = elements.batchVideoSourceAuto;
+  const manualRadio = elements.batchVideoSourceManual;
+  const autoLabel = elements.videoSourceAutoLabel;
+  const manualLabel = elements.videoSourceManualLabel;
+  const manualWrap = elements.batchManualUrlWrap;
+
+  function syncVideoRadio() {
+    const isManual = manualRadio && manualRadio.checked;
+    if (autoLabel) autoLabel.classList.toggle('active', !isManual);
+    if (manualLabel) manualLabel.classList.toggle('active', isManual);
+    if (manualWrap) manualWrap.style.display = isManual ? 'block' : 'none';
+  }
+
+  if (autoRadio) autoRadio.addEventListener('change', syncVideoRadio);
+  if (manualRadio) manualRadio.addEventListener('change', syncVideoRadio);
+
+  // Pattern strategy change updates chips
+  if (elements.batchPatternStrategy) {
+    elements.batchPatternStrategy.addEventListener('change', () => {
+      renderBatchArticlesPreview();
+    });
+  }
+}
+
+function setPipelineStep(step) {
+  const nodes = [elements.step1Node, elements.step2Node, elements.step3Node, elements.step4Node];
+  const lines = [elements.stepLine1, elements.stepLine2, elements.stepLine3];
+
+  nodes.forEach((node, i) => {
+    if (!node) return;
+    const stepNum = i + 1;
+    node.classList.remove('active', 'completed');
+    if (stepNum < step) {
+      node.classList.add('completed');
+    } else if (stepNum === step) {
+      node.classList.add('active');
+    }
+  });
+
+  lines.forEach((line, i) => {
+    if (!line) return;
+    line.classList.toggle('completed', (i + 1) < step);
+  });
+}
+
+function updateRunnerTimer() {
+  if (!batchState.startTime || !elements.runnerTimeText) return;
+  const elapsedSec = Math.floor((Date.now() - batchState.startTime) / 1000);
+  const m = Math.floor(elapsedSec / 60);
+  const s = elapsedSec % 60;
+  elements.runnerTimeText.textContent = `Time elapsed: ${m > 0 ? `${m}m ` : ''}${s}s`;
+}
+
+function stopBatchWorkflow() {
+  batchState.isRunning = false;
+  if (batchState.timerInterval) {
+    clearInterval(batchState.timerInterval);
+    batchState.timerInterval = null;
+  }
+  if (elements.runnerHeadlineStatus) {
+    elements.runnerHeadlineStatus.textContent = '🛑 Batch workflow stopped by user';
+  }
+  showToast('Batch automation stopped', 'warning');
+}
+
+async function startBatchWorkflow() {
+  const selectedList = Array.from(state.selectedNewsForBatch.values());
+  if (selectedList.length === 0) {
+    showToast('Please select at least 1 news story to generate reels', 'warning');
+    return;
+  }
+
+  // Read batch settings
+  const isManualSource = elements.batchVideoSourceManual?.checked;
+  const globalManualUrl = (elements.batchGlobalManualUrl?.value || '').trim();
+  const patternStrategy = elements.batchPatternStrategy?.value || 'cycle';
+  const autoPostIg = elements.batchAutoPostIgToggle ? elements.batchAutoPostIgToggle.checked : true;
+  const postDelaySec = parseInt(elements.batchPostDelaySelect?.value || '10', 10);
+
+  // Initialize batch state
+  batchState.isRunning = true;
+  batchState.startTime = Date.now();
+  batchState.results = [];
+  batchState.queue = selectedList.map((art, idx) => ({
+    article: art,
+    index: idx,
+    pattern: getPatternForIndex(patternStrategy, idx),
+    manualUrl: art.manualVideoUrl || (isManualSource ? globalManualUrl : ''),
+    status: 'queued',
+    stepText: 'Queued...',
+    videoUrl: '',
+    postUrl: '',
+    renderedFilename: '',
+    errorMsg: ''
+  }));
+
+  // Switch to Screen 2 (Running)
+  if (elements.batchScreenSetup) elements.batchScreenSetup.style.display = 'none';
+  if (elements.batchScreenRunning) elements.batchScreenRunning.style.display = 'block';
+  if (elements.batchScreenSummary) elements.batchScreenSummary.style.display = 'none';
+
+  if (batchState.timerInterval) clearInterval(batchState.timerInterval);
+  batchState.timerInterval = setInterval(updateRunnerTimer, 1000);
+
+  // Render Queue Table
+  renderRunnerQueue();
+
+  const total = batchState.queue.length;
+
+  for (let i = 0; i < total; i++) {
+    if (!batchState.isRunning) break;
+
+    const item = batchState.queue[i];
+    item.status = 'working';
+    renderRunnerQueue();
+
+    // Update Overall Progress Bar
+    const progressPct = Math.round((i / total) * 100);
+    if (elements.batchOverallProgressFill) elements.batchOverallProgressFill.style.width = `${progressPct}%`;
+    if (elements.runnerCounterPill) elements.runnerCounterPill.textContent = `Reel ${i + 1} of ${total} (${progressPct}%)`;
+    if (elements.runnerHeadlineStatus) elements.runnerHeadlineStatus.textContent = `Processing story ${i + 1} of ${total}`;
+    if (elements.currentStoryTitle) elements.currentStoryTitle.textContent = item.article.title;
+    if (elements.currentPatternBadge) elements.currentPatternBadge.textContent = `🎬 Pattern: ${formatPatternName(item.pattern)}`;
+
+    try {
+      // STEP 1: Extract Factual News Headline, 2-3 Line Description & Video Search Queries
+      setPipelineStep(1);
+      if (elements.runnerSubtext) elements.runnerSubtext.textContent = 'Step 1/4: Synthesizing breaking headline & 2-3 line news summary...';
+      item.stepText = 'Extracting news story...';
+      renderRunnerQueue();
+
+      let hookData = null;
+      try {
+        const hookRes = await fetch('/api/reel-hooks', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            title: item.article.title,
+            publisher: item.article.publisher || '',
+            category: state.currentTopic || '',
+            vibe: 'news',
+            related_coverage: item.article.related_coverage || []
+          })
+        });
+        hookData = await hookRes.json();
+      } catch (err) {
+        console.warn('[BATCH] AI hook fallback:', err);
+      }
+
+      const rawTitle = item.article.title.trim();
+      const defaultHeadline = rawTitle.toUpperCase().startsWith('BREAKING') ? rawTitle : `BREAKING: ${rawTitle}`;
+      const topHook = hookData?.headline || hookData?.hooks?.[0]?.top_hook || defaultHeadline;
+      const description = hookData?.description || hookData?.hooks?.[0]?.caption || item.article.title;
+      const subBadge = hookData?.sub_badge || '🔴 BREAKING NEWS';
+      const searchQueries = hookData?.search_queries || [];
+      const igCaption = hookData?.ig_caption || `${topHook}\n\n${description}\n\nStay tuned for real-time global news updates.\n\n#breakingnews #news #reels`;
+      const hashtags = hookData?.hashtags || '#breakingnews #worldnews #reels #viral #trending #todaynews';
+
+      if (!batchState.isRunning) break;
+
+      // STEP 2: Fetch Relatable Video Footage from Internet or Custom URL
+      setPipelineStep(2);
+      if (elements.runnerSubtext) elements.runnerSubtext.textContent = item.manualUrl 
+        ? 'Step 2/4: Fetching custom background video from URL...'
+        : 'Step 2/4: Searching YouTube for relatable news footage & CCTV/b-roll...';
+      item.stepText = 'Fetching relatable video...';
+      renderRunnerQueue();
+
+      const videoPayload = item.manualUrl
+        ? { type: 'url', url: item.manualUrl }
+        : {
+            type: 'search',
+            query: item.article.title,
+            search_queries: searchQueries
+          };
+
+      let videoFilename = 'sample_reel.mp4';
+      try {
+        const fetchVidRes = await fetch('/api/fetch-reel-video', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(videoPayload)
+        });
+        const vidJson = await fetchVidRes.json();
+        if (vidJson.success && vidJson.videoUrl) {
+          const match = vidJson.videoUrl.match(/name=([^&]+)/);
+          if (match) videoFilename = decodeURIComponent(match[1]);
+        }
+      } catch (vfErr) {
+        console.warn('[BATCH] Video fetch fallback to sample_reel:', vfErr);
+      }
+
+      if (!batchState.isRunning) break;
+
+      // STEP 3: Render 9:16 HD Reel with Pattern Overlay
+      setPipelineStep(3);
+      if (elements.runnerSubtext) elements.runnerSubtext.textContent = `Step 3/4: Compositing 9:16 Full HD Reel with pattern: ${formatPatternName(item.pattern)}...`;
+      item.stepText = 'Rendering 9:16 HD Reel...';
+      renderRunnerQueue();
+
+      const overlayPng = getReelOverlayDataUrl({
+        layout: item.pattern,
+        topHook: topHook,
+        caption: description,
+        publisher: item.article.publisher || 'TODAY MEMER',
+        subBadge: subBadge,
+        quality: 'hd1080'
+      });
+
+      const renderRes = await fetch('/api/render-reel-video', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          video_name: videoFilename,
+          overlay: overlayPng,
+          layout: item.pattern,
+          duration: 12,
+          quality: 'hd1080',
+          color_grade: 'none'
+        })
+      });
+      const renderJson = await renderRes.json();
+      if (!renderRes.ok || !renderJson.success) {
+        throw new Error(renderJson.error || 'Failed to render 9:16 video');
+      }
+
+      item.renderedFilename = renderJson.filename;
+      item.videoUrl = renderJson.videoUrl;
+
+      if (!batchState.isRunning) break;
+
+      // STEP 4: Direct Auto-Publish to Instagram Reels
+      setPipelineStep(4);
+      if (autoPostIg && igState.connected) {
+        if (elements.runnerSubtext) elements.runnerSubtext.textContent = 'Step 4/4: Uploading and publishing 9:16 Reel to Instagram...';
+        item.stepText = 'Publishing to Instagram...';
+        renderRunnerQueue();
+
+        try {
+          const igRes = await fetch('/api/instagram/publish-reel', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              video_name: item.renderedFilename,
+              overlay: overlayPng,
+              layout: item.pattern,
+              caption: igCaption,
+              hashtags: hashtags
+            })
+          });
+          const igJson = await igRes.json();
+          if (igRes.ok && igJson.success) {
+            item.postUrl = igJson.post_url || igJson.reel_url;
+            item.stepText = 'Published on Instagram!';
+          } else {
+            console.warn('[BATCH] Instagram publish note:', igJson.error);
+            item.errorMsg = igJson.error || 'Instagram upload note';
+            item.stepText = 'Rendered (IG upload skipped)';
+          }
+        } catch (igErr) {
+          console.warn('[BATCH] Instagram publish error:', igErr);
+          item.errorMsg = igErr.message;
+          item.stepText = 'Rendered (IG skipped)';
+        }
+      } else {
+        item.stepText = 'Rendered & Saved Locally';
+      }
+
+      item.status = 'done';
+      batchState.results.push(item);
+      renderRunnerQueue();
+
+      // Pause delay between Instagram posts
+      if (autoPostIg && igState.connected && i < total - 1) {
+        for (let s = postDelaySec; s > 0; s--) {
+          if (!batchState.isRunning) break;
+          if (elements.runnerSubtext) {
+            elements.runnerSubtext.textContent = `⏳ Waiting ${s}s before next post to respect Instagram limits...`;
+          }
+          await new Promise(r => setTimeout(r, 1000));
+        }
+      }
+
+    } catch (storyErr) {
+      console.error(`[BATCH] Error on story ${i + 1}:`, storyErr);
+      item.status = 'error';
+      item.errorMsg = storyErr.message || 'Workflow error';
+      item.stepText = `Failed: ${item.errorMsg.slice(0, 30)}`;
+      batchState.results.push(item);
+      renderRunnerQueue();
+    }
+  }
+
+  // Finalize Workflow
+  if (batchState.timerInterval) {
+    clearInterval(batchState.timerInterval);
+    batchState.timerInterval = null;
+  }
+
+  if (elements.batchOverallProgressFill) elements.batchOverallProgressFill.style.width = '100%';
+  setPipelineStep(4);
+
+  // Switch to Screen 3 (Summary)
+  showBatchSummaryScreen();
+}
+
+function renderRunnerQueue() {
+  if (!elements.runnerQueueList) return;
+  elements.runnerQueueList.innerHTML = '';
+
+  batchState.queue.forEach((item, idx) => {
+    const card = document.createElement('div');
+    card.className = `runner-item-card${item.status === 'working' ? ' is-processing' : ''}${item.status === 'done' ? ' is-done' : ''}`;
+
+    let badgeClass = 'queued';
+    let badgeText = '⏳ Queued';
+    if (item.status === 'working') {
+      badgeClass = 'working';
+      badgeText = `⚡ ${item.stepText || 'Processing...'}`;
+    } else if (item.status === 'done') {
+      badgeClass = 'done';
+      badgeText = item.postUrl ? '✅ Published on IG' : '✅ Reel Rendered';
+    } else if (item.status === 'error') {
+      badgeClass = 'error';
+      badgeText = '❌ Failed';
+    }
+
+    let linkHtml = '';
+    if (item.postUrl) {
+      linkHtml = `<a href="${escapeHtml(item.postUrl)}" target="_blank" rel="noopener noreferrer" class="runner-item-link">View IG ↗</a>`;
+    } else if (item.videoUrl) {
+      linkHtml = `<a href="${escapeHtml(item.videoUrl)}" target="_blank" download="reel_${idx+1}.mp4" class="runner-item-link">Download ⬇</a>`;
+    }
+
+    card.innerHTML = `
+      <div class="runner-item-left">
+        <span class="runner-item-num">#${idx + 1}</span>
+        <span class="runner-item-title" title="${escapeHtml(item.article.title)}">${escapeHtml(item.article.title)}</span>
+        <span class="runner-item-pattern">${formatPatternName(item.pattern)}</span>
+      </div>
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <span class="runner-item-status-badge ${badgeClass}">${badgeText}</span>
+        ${linkHtml}
+      </div>
+    `;
+    elements.runnerQueueList.appendChild(card);
+  });
+}
+
+function showBatchSummaryScreen() {
+  if (elements.batchScreenSetup) elements.batchScreenSetup.style.display = 'none';
+  if (elements.batchScreenRunning) elements.batchScreenRunning.style.display = 'none';
+  if (elements.batchScreenSummary) elements.batchScreenSummary.style.display = 'block';
+
+  const total = batchState.results.length;
+  const posted = batchState.results.filter(r => r.postUrl).length;
+  const rendered = batchState.results.filter(r => r.renderedFilename).length;
+  const uniquePatterns = new Set(batchState.results.map(r => r.pattern)).size;
+
+  if (elements.statReelsCreated) elements.statReelsCreated.textContent = rendered;
+  if (elements.statReelsPosted) elements.statReelsPosted.textContent = posted;
+  if (elements.statPatternsUsed) elements.statPatternsUsed.textContent = uniquePatterns;
+
+  if (elements.summaryStatsText) {
+    elements.summaryStatsText.textContent = posted > 0
+      ? `Successfully rendered ${rendered} full HD reels and published ${posted} directly to Instagram!`
+      : `Successfully rendered ${rendered} full HD reels with custom layouts ready for download.`;
+  }
+
+  // Populate gallery
+  if (elements.summaryGalleryGrid) {
+    elements.summaryGalleryGrid.innerHTML = '';
+    batchState.results.forEach((res, i) => {
+      if (!res.renderedFilename && !res.videoUrl) return;
+      const card = document.createElement('div');
+      card.className = 'gallery-card';
+
+      const igBtn = res.postUrl
+        ? `<a href="${escapeHtml(res.postUrl)}" target="_blank" rel="noopener noreferrer" class="gallery-ig-link">📸 View on Instagram ↗</a>`
+        : `<span style="font-size: 11px; color: var(--text-dim);">Saved locally</span>`;
+
+      card.innerHTML = `
+        <div class="gallery-card-top">
+          <span class="gallery-card-pattern">🎬 ${formatPatternName(res.pattern)}</span>
+          <span style="font-size: 11px; color: var(--accent-cyan); font-weight: 700;">#${i + 1}</span>
+        </div>
+        <div class="gallery-card-title">${escapeHtml(res.article.title)}</div>
+        <div class="gallery-card-actions">
+          ${igBtn}
+          <a href="${escapeHtml(res.videoUrl || `/api/serve-video?name=${res.renderedFilename}`)}" target="_blank" download="reel_${i+1}.mp4" class="gallery-download-btn">⬇ MP4</a>
+        </div>
+      `;
+      elements.summaryGalleryGrid.appendChild(card);
+    });
+  }
+
+  showToast(`🎉 Batch automation complete: ${rendered} reels rendered!`, 'success');
+}
+
 // Global window helpers for inline HTML onclick handlers
 window.openStudioModal = openStudioModal;
 window.closeStudioModal = closeStudioModal;
@@ -4905,6 +5748,10 @@ window.closeInstagramModal = closeInstagramModal;
 window.closeIgPublishModal = closeIgPublishModal;
 window.openDatasetModal = openDatasetModal;
 window.closeDatasetModal = closeDatasetModal;
+window.openBatchReelModal = openBatchReelModal;
+window.closeBatchReelModal = closeBatchReelModal;
+window.startBatchWorkflow = startBatchWorkflow;
+window.stopBatchWorkflow = stopBatchWorkflow;
 
 // Start application
 window.addEventListener('DOMContentLoaded', init);

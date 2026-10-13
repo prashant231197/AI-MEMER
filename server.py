@@ -313,10 +313,48 @@ def ensure_h264_mp4(src_path):
     return src_path
 
 
-def fetch_or_search_video(source_input, is_search=False):
+def extract_news_search_queries(headline, related_coverage=None):
+    """
+    Extract substantive keywords to form multiple prioritized search queries
+    specifically for finding relevant news b-roll and broadcast footage.
+    """
+    clean_h = re.sub(r"[^\w\s]", " ", headline)
+    stop_words = {
+        "the", "and", "for", "with", "from", "that", "this", "after", "into", "over",
+        "says", "said", "will", "what", "when", "where", "how", "today", "news", "amid",
+        "first", "about", "could", "have", "been", "their", "more", "also", "some", "cost",
+        "costs", "just", "like", "they", "than", "were", "here", "there", "breaking"
+    }
+    words = [w for w in clean_h.split() if len(w) > 2 and w.lower() not in stop_words]
+    core_kw = " ".join(words[:4]) if words else headline[:30]
+
+    related_kws = []
+    if related_coverage and isinstance(related_coverage, list):
+        for item in related_coverage[:3]:
+            r_title = item.get("title", "") if isinstance(item, dict) else str(item)
+            r_clean = re.sub(r"[^\w\s]", " ", r_title)
+            r_words = [w for w in r_clean.split() if len(w) > 2 and w.lower() not in stop_words]
+            if r_words:
+                related_kws.append(" ".join(r_words[:4]))
+
+    queries = [
+        f"{core_kw} footage",
+        f"{core_kw} news report",
+    ]
+    if related_kws:
+        queries.insert(1, f"{related_kws[0]} footage")
+        if len(related_kws) > 1:
+            queries.append(f"{related_kws[1]} news")
+    queries.append(f"{core_kw} b roll")
+    queries.append(f"{core_kw} broadcast")
+    return queries
+
+
+def fetch_or_search_video(source_input, is_search=False, related_queries=None):
     """
     Downloads highest-quality HD video from Instagram Reel, YouTube Shorts,
-    TikTok, Pinterest, direct MP4 link, or searches the web for HD video clips.
+    TikTok, Pinterest, direct MP4 link, or searches the web for relatable news video clips.
+    Uses multi-query retry loop and filters out irrelevant entertainment/gaming/roller coaster footage.
     """
     source_clean = source_input.strip()
     cache_key = f"{'search_' if is_search else 'url_'}{source_clean}"
@@ -330,36 +368,14 @@ def fetch_or_search_video(source_input, is_search=False):
             return cached_file, cached_title, vid_info
 
     file_id = hashlib.md5(source_clean.encode()).hexdigest()[:10]
-    out_template = os.path.join(VIDEO_DIR, f"reel_{file_id}.%(ext)s")
 
-    if is_search:
-        target_query = f"ytsearch1:{source_clean} 4k hd reel 15 seconds"
-    else:
+    # Direct URL mode (Instagram, YouTube, direct MP4, etc.)
+    if not is_search:
         target_query = source_clean
+        out_template = os.path.join(VIDEO_DIR, f"reel_{file_id}.%(ext)s")
 
-    # Fast high-definition video extraction options (Parallel & Optimized)
-    ydl_opts = {
-        "ffmpeg_location": FFMPEG_PATH,
-        # Prefer fast mp4 streams under 1080p, avoid massive multi-hundred-megabyte files
-        "format": "best[ext=mp4][height<=1080]/bestvideo[height<=1080]+bestaudio/best[height<=720]/best",
-        "merge_output_format": "mp4",
-        "outtmpl": out_template,
-        "quiet": True,
-        "no_warnings": True,
-        "noplaylist": True,
-        "socket_timeout": 12,
-        "concurrent_fragment_downloads": 4,
-        "max_filesize": 45 * 1024 * 1024,  # Cap at 45MB so large videos are not slowly downloaded
-        "http_headers": {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
-            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,video/*,*/*;q=0.8",
-            "Accept-Language": "en-US,en;q=0.9",
-        }
-    }
-
-    try:
-        # Check if direct Instagram Reel and instagrapi is connected
-        if ("instagram.com/reel/" in target_query or "instagram.com/p/" in target_query) and not is_search:
+        # Direct Instagram Reel via instagrapi
+        if ("instagram.com/reel/" in target_query or "instagram.com/p/" in target_query):
             cl = get_instagram_client()
             if cl:
                 try:
@@ -375,6 +391,18 @@ def fetch_or_search_video(source_input, is_search=False):
                 except Exception as ig_err:
                     print(f"[INSTAGRAM] instagrapi fallback note: {ig_err}")
 
+        ydl_opts = {
+            "ffmpeg_location": FFMPEG_PATH,
+            "format": "bestvideo[height<=1080]+bestaudio/best[height<=1080]/best[height<=720]/best",
+            "merge_output_format": "mp4",
+            "outtmpl": out_template,
+            "quiet": True,
+            "no_warnings": True,
+            "noplaylist": True,
+            "socket_timeout": 15,
+            "concurrent_fragment_downloads": 4,
+            "max_filesize": 50 * 1024 * 1024,
+        }
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(target_query, download=True)
             if "entries" in info and info["entries"]:
@@ -383,35 +411,126 @@ def fetch_or_search_video(source_input, is_search=False):
             final_filename = f"reel_{file_id}.mp4"
             actual_path = os.path.join(VIDEO_DIR, final_filename)
             if not os.path.exists(actual_path):
-                # Search for matching downloaded files (e.g. .mp4, .webm, .mkv)
                 candidates = [f for f in os.listdir(VIDEO_DIR) if f.startswith(f"reel_{file_id}") and not f.endswith(".part")]
                 if candidates:
                     candidates.sort(key=lambda x: (x.endswith(".mp4"), os.path.getsize(os.path.join(VIDEO_DIR, x))), reverse=True)
                     actual_path = os.path.join(VIDEO_DIR, candidates[0])
-                    final_filename = candidates[0]
 
-            # Ensure H.264 MP4 encoding for 100% browser compatibility
             ensured_path = ensure_h264_mp4(actual_path)
             final_filename = os.path.basename(ensured_path)
-
             v_info = get_video_info(ensured_path)
             title = info.get("title", "HD Video Clip")
             VIDEO_CACHE[cache_key] = {"filename": final_filename, "title": title}
             return final_filename, title, v_info
 
-    except Exception as e:
-        print(f"[YT-DLP] Error downloading video for {source_clean[:40]}: {e}")
-        # Clean up any partial files
-        for f in os.listdir(VIDEO_DIR):
-            if f.startswith(f"reel_{file_id}") and f.endswith(".part"):
-                try: os.remove(os.path.join(VIDEO_DIR, f))
-                except: pass
+    # Search Mode with Multi-Query & Candidate Retry Loop
+    queries_to_try = []
+    if related_queries and isinstance(related_queries, list):
+        for rq in related_queries:
+            if isinstance(rq, str) and rq.strip() and rq.strip() not in queries_to_try:
+                queries_to_try.append(rq.strip())
 
-        if os.path.exists(os.path.join(VIDEO_DIR, "sample_reel.mp4")):
-            sample_path = os.path.join(VIDEO_DIR, "sample_reel.mp4")
-            v_info = get_video_info(sample_path)
-            return "sample_reel.mp4", "News Background Motion Clip", v_info
-        raise
+    generated_queries = extract_news_search_queries(source_clean)
+    for gq in generated_queries:
+        if gq not in queries_to_try:
+            queries_to_try.append(gq)
+
+    print(f"[VIDEO_SEARCH] Searching relatable footage for: '{source_clean[:60]}'")
+    print(f"[VIDEO_SEARCH] Queries to attempt: {queries_to_try}")
+
+    bad_terms = [
+        "gameplay", "roller coaster", "six flags", "minecraft", "roblox",
+        "gta", "prank", "music video", "dance challenge", "parody",
+        "funny meme", "compilation", "tiktok dance", "makeup tutorial"
+    ]
+
+    for q_idx, q in enumerate(queries_to_try):
+        print(f"[VIDEO_SEARCH] Attempt {q_idx + 1}/{len(queries_to_try)}: '{q}'")
+        clean_q = re.sub(r"[^\w\s-]", " ", q).strip()
+        search_target = f"ytsearch6:{clean_q}"
+
+        ydl_search_opts = {
+            "quiet": True,
+            "no_warnings": True,
+            "extract_flat": True,
+            "socket_timeout": 12,
+        }
+
+        entries = []
+        try:
+            with yt_dlp.YoutubeDL(ydl_search_opts) as ydl_s:
+                search_res = ydl_s.extract_info(search_target, download=False)
+                if search_res and "entries" in search_res:
+                    entries = [e for e in search_res["entries"] if e]
+        except Exception as se:
+            print(f"[VIDEO_SEARCH] Search flat extract note for '{q}': {se}")
+            continue
+
+        if not entries:
+            continue
+
+        valid_candidates = []
+        for e in entries:
+            d = e.get("duration") or 0
+            t = (e.get("title") or "").lower()
+            is_live = bool(e.get("is_live"))
+            if not is_live and (5 <= d <= 600 or d == 0) and not any(bt in t for bt in bad_terms):
+                valid_candidates.append(e)
+
+        if not valid_candidates:
+            print(f"[VIDEO_SEARCH] No suitable clean candidates in query '{q}'. Trying next query...")
+            continue
+
+        for cand in valid_candidates:
+            cand_url = cand.get("url") or cand.get("webpage_url") or f"https://www.youtube.com/watch?v={cand.get('id')}"
+            cand_title = cand.get("title") or "News Footage"
+            cand_id = hashlib.md5(cand_url.encode()).hexdigest()[:10]
+            out_template = os.path.join(VIDEO_DIR, f"reel_{cand_id}.%(ext)s")
+
+            print(f"[VIDEO_SEARCH] Downloading candidate '{cand_title[:45]}' ({cand.get('duration')}s)...")
+
+            download_opts = {
+                "ffmpeg_location": FFMPEG_PATH,
+                "format": "bestvideo[height<=720]+bestaudio/best[height<=720]/best",
+                "merge_output_format": "mp4",
+                "outtmpl": out_template,
+                "quiet": True,
+                "no_warnings": True,
+                "noplaylist": True,
+                "socket_timeout": 18,
+                "max_filesize": 45 * 1024 * 1024,
+            }
+
+            try:
+                with yt_dlp.YoutubeDL(download_opts) as ydl_d:
+                    ydl_d.download([cand_url])
+
+                cand_files = [f for f in os.listdir(VIDEO_DIR) if f.startswith(f"reel_{cand_id}") and not f.endswith(".part")]
+                if cand_files:
+                    cand_files.sort(key=lambda x: (x.endswith(".mp4"), os.path.getsize(os.path.join(VIDEO_DIR, x))), reverse=True)
+                    actual_path = os.path.join(VIDEO_DIR, cand_files[0])
+                    if os.path.exists(actual_path) and os.path.getsize(actual_path) > 20000:
+                        ensured_path = ensure_h264_mp4(actual_path)
+                        final_filename = os.path.basename(ensured_path)
+                        v_info = get_video_info(ensured_path)
+                        VIDEO_CACHE[cache_key] = {"filename": final_filename, "title": cand_title}
+                        print(f"[VIDEO_SEARCH] Successfully fetched relatable news video: {final_filename} ('{cand_title[:45]}')")
+                        return final_filename, cand_title, v_info
+            except Exception as de:
+                print(f"[VIDEO_SEARCH] Candidate download failed ({cand_title[:30]}): {de}. Retrying next...")
+                for f in os.listdir(VIDEO_DIR):
+                    if f.startswith(f"reel_{cand_id}") and f.endswith(".part"):
+                        try: os.remove(os.path.join(VIDEO_DIR, f))
+                        except: pass
+                continue
+
+    # Clean Fallback (if all internet searches failed, use sample_reel.mp4, NEVER a random roller coaster)
+    sample_path = os.path.join(VIDEO_DIR, "sample_reel.mp4")
+    if os.path.exists(sample_path) and os.path.getsize(sample_path) > 1000:
+        v_info = get_video_info(sample_path)
+        return "sample_reel.mp4", "News Background Motion Clip", v_info
+
+    raise RuntimeError(f"Could not find or download relatable video footage for: {source_clean[:50]}")
 
 
 def call_groq_chat(messages, max_tokens=1500, temperature=0.8):
@@ -982,93 +1101,64 @@ VIRAL_REEL_DATASET = [
 ]
 
 
-def generate_reel_hooks(title, publisher="", category="", vibe="dark"):
+def generate_news_reel_content(title, publisher="", category="", vibe="news", related_coverage=None):
     """
-    Generate viral 9:16 Reel hooks tailored across News, Dark Memes, Reddit Stories, and Collabs.
+    Generates:
+    1. Prominent Headline: 'BREAKING: {title}'
+    2. 2-3 Line Factual News Description: Concise summary synthesized from related coverage & headline.
+    3. Relatable Video Search Queries for finding real news footage.
     """
     title_clean = ' '.join(title.split()).strip()
 
-    vibe_descriptions = {
-        "dark": "dark humor, existential irony, deep meme think, savage punchlines, simulation glitches",
-        "news": "breaking news parody, dramatic headlines, live TV broadcast commentary, urgent alerts",
-        "reddit": "r/AskReddit dilemmas, r/Confessions secrets, r/AITA dramatic relationship stories",
-        "savage": "savage reality check, unhinged sarcasm, relatable financial/work dread",
-        "collab": "multi-clip meme mashup, reaction drops, dual screen comparison",
-        "brainrot": "Gen-Z surreal humor, satisfying gameplay combo, viral TikTok irony",
-        "creator": "podcast wisdom highlight, retro VHS nostalgia, cyberpunk aesthetic"
-    }
-    vibe_context = vibe_descriptions.get(vibe, "viral short-form engagement, curiosity gap, relatable punchlines")
+    # Build headline with BREAKING prefix
+    headline_clean = title_clean
+    if not headline_clean.upper().startswith("BREAKING"):
+        headline_with_prefix = f"BREAKING: {headline_clean}"
+    else:
+        headline_with_prefix = headline_clean
 
-    prompt = f"""You are an elite viral 9:16 Instagram Reels & TikTok creator with 5M followers.
-News Headline or Topic: "{title_clean}"
+    # Extract related coverage texts
+    related_texts = []
+    if related_coverage and isinstance(related_coverage, list):
+        for r in related_coverage:
+            if isinstance(r, dict):
+                r_title = r.get("title", "").strip()
+                r_pub = r.get("publisher", "").strip()
+                if r_title:
+                    related_texts.append(f"- {r_title} ({r_pub})" if r_pub else f"- {r_title}")
+            elif isinstance(r, str) and r.strip():
+                related_texts.append(f"- {r.strip()}")
+
+    related_context = "\n".join(related_texts) if related_texts else "None"
+
+    prompt = f"""You are a senior broadcast news editor and short-form video producer.
+Main News Headline: "{title_clean}"
 Publisher/Source: "{publisher}"
-Target Category: "{category}"
-Vibe Request: {vibe} ({vibe_context})
+Category: "{category}"
+Related Coverage from other major outlets:
+{related_context}
 
-Generate 4 viral 9:16 Reel hooks and captions tailored to this vibe.
-Select from our 20 viral patterns:
-- reel_split (Split-Screen Breaking News Card)
-- reel_chyron (Breaking TV Live Parody & Ticker)
-- reel_unusual_whales (Market & Money Satire)
-- reel_fake_notification (Shock Breaking Notification)
-- reel_headline_reaction (Headline + Meme Reaction Collab)
-- reel_dark_humor (Existential Dark Meme)
-- reel_impact (Classic Savage Impact Meme)
-- reel_simulation_glitch (Simulation Glitch Matrix)
-- reel_tweet_dark (OLED Dark Mode Viral X Thread)
-- reel_savage_reality (Savage Reality Check)
-- reel_reddit_story (r/AskReddit Deep Thoughts)
-- reel_reddit_confession (r/Confession Dark Secrets)
-- reel_reddit_aita (r/AITA Dramatic Storytime)
-- reel_mashup_montage (4-Clip Fast-Paced Montage)
-- reel_brainrot_subway (Dual Screen Brainrot Collab)
-- reel_pip_commentary (PiP Reaction Commentary)
-- reel_before_after (Expectation vs Reality Contrast)
-- reel_podcast_clip (Podcast Soundwave & Subtitles)
-- reel_retro_vhs (Retro 90s VHS Camcorder)
-- reel_neon_cyberpunk (Cyberpunk Neon 2077 HUD)
+Create a factual, high-impact 9:16 News Reel script following these exact requirements:
+1. "headline": Must start with "BREAKING: " followed by the factual news headline: "{title_clean}". (Do NOT make joke memes or replace it with generic text).
+2. "description": A concise, factual 2 to 3 line news description summarizing the story and related developments (e.g. key impact, quotes, actions taken, or dilemma). Length: 2 to 3 short sentences, max 220 characters.
+3. "sub_badge": A relevant live badge (e.g. "🔴 BREAKING NEWS", "⚡ DEVELOPING STORY", "GLOBAL REPORT").
+4. "search_queries": An array of 3 specific search queries for finding relatable news b-roll footage of this exact event on YouTube (e.g. key locations, military/political entities, news b-roll).
+5. "ig_caption": An engaging Instagram Reel caption with the headline, description, and 6-8 relevant news hashtags.
 
 Respond ONLY with valid JSON:
 {{
-  "headline": "{title_clean}",
-  "hooks": [
-    {{
-      "layout": "reel_split",
-      "top_hook": "POV: YOU OPENED THE NEWS TODAY 💀",
-      "caption": "Savage commentary or dark meme reflection on this story...",
-      "sub_badge": "WAIT TILL THE END 😭",
-      "vibe": "Breaking News"
-    }},
-    {{
-      "layout": "reel_reddit_story",
-      "top_hook": "What is a harsh truth nobody talks about?",
-      "caption": "Deep unfiltered confession or observation...",
-      "sub_badge": "r/AskReddit 🤖",
-      "vibe": "Reddit Story"
-    }},
-    {{
-      "layout": "reel_dark_humor",
-      "top_hook": "Smiling through the existential dread 🙂",
-      "caption": "Just another completely normal day on planet Earth...",
-      "sub_badge": "DARK HUMOR 💀",
-      "vibe": "Dark Meme"
-    }},
-    {{
-      "layout": "reel_mashup_montage",
-      "top_hook": "THIS TOOK A COMPLETE 180° TURN 🤯",
-      "caption": "Watch till the final clip drop...",
-      "sub_badge": "4-CLIP MASHUP 🎬",
-      "vibe": "Collab Mashup"
-    }}
-  ],
-  "caption": "POV: YOU OPENED THE NEWS TODAY 💀\n\n{title_clean}\n\nWe really living in an unscripted simulation at this point 😭\n\nTag a friend who needs to see this 👇",
-  "hashtags": "#memes #darkhumor #news #redditstories #trending #reels #viral #relatable"
+  "headline": "{headline_with_prefix}",
+  "description": "2-3 lines of factual news description...",
+  "sub_badge": "🔴 BREAKING NEWS",
+  "search_queries": ["query 1", "query 2", "query 3"],
+  "ig_caption": "{headline_with_prefix}\\n\\n[Description]\\n\\nFollow @today_memer for real-time global news updates.",
+  "hashtags": "#breakingnews #worldnews #news"
 }}"""
 
     raw = call_groq_chat([
-        {"role": "system", "content": "You are a master viral meme & reel scriptwriter. Output strictly valid JSON."},
+        {"role": "system", "content": "You are a broadcast news editor. Output strictly valid JSON with factual headline and 2-3 line description."},
         {"role": "user", "content": prompt}
-    ], max_tokens=1000, temperature=0.85)
+    ], max_tokens=800, temperature=0.7)
 
     if raw:
         try:
@@ -1076,58 +1166,144 @@ Respond ONLY with valid JSON:
             if clean.startswith("```"):
                 clean = re.sub(r"^```(?:json)?\s*", "", clean)
                 clean = re.sub(r"\s*```$", "", clean)
+            clean = re.sub(r',\s*([\]}])', r'\1', clean)
             try:
-                parsed = json.loads(clean)
+                parsed = json.loads(clean, strict=False)
             except Exception:
                 m = re.search(r'(\{.*\})', clean, re.DOTALL)
                 if m:
-                    parsed = json.loads(m.group(1))
+                    clean_m = re.sub(r',\s*([\]}])', r'\1', m.group(1))
+                    parsed = json.loads(clean_m, strict=False)
                 else:
                     raise
-            if "hooks" in parsed and isinstance(parsed["hooks"], list):
+            if parsed.get("headline") and parsed.get("description"):
+                if not parsed["headline"].upper().startswith("BREAKING"):
+                    parsed["headline"] = f"BREAKING: {parsed['headline']}"
                 return parsed
         except Exception as e:
-            print(f"[GROQ] Error parsing reel hooks: {e}")
+            print(f"[GROQ] Error parsing news reel content: {e}")
 
-    # Fallback viral hooks
+    # Fallback when Groq is unavailable or parsing fails
+    if related_texts:
+        clean_rels = [re.sub(r"^[-\s]+", "", rt).split("(")[0].strip() for rt in related_texts]
+        if len(clean_rels) >= 2:
+            desc = f"{clean_rels[0]}. {clean_rels[1]}."
+        else:
+            desc = f"{clean_rels[0]}. Official sources are closely tracking new developments."
+    else:
+        desc = f"Reports from {publisher or 'major news outlets'} confirm significant developments regarding {title_clean}. International officials are monitoring the situation as events unfold."
+
+    search_qs = extract_news_search_queries(title_clean, related_coverage)
+
     return {
-        "headline": title_clean,
+        "headline": headline_with_prefix,
+        "description": desc,
+        "sub_badge": "🔴 BREAKING NEWS",
+        "search_queries": search_qs,
+        "ig_caption": f"{headline_with_prefix}\n\n{desc}\n\nStay tuned for ongoing coverage and updates.\n\nFollow for daily breaking news.",
+        "hashtags": "#breakingnews #worldnews #globalnews #reels #trending #news"
+    }
+
+
+def generate_reel_hooks(title, publisher="", category="", vibe="news", related_coverage=None):
+    """
+    Generate factual 9:16 Reel headline ('BREAKING: ...') and 2-3 line news description.
+    """
+    content = generate_news_reel_content(title, publisher, category, vibe, related_coverage)
+    headline = content.get("headline") or (f"BREAKING: {title}" if not title.upper().startswith("BREAKING") else title)
+    description = content.get("description") or title
+    sub_badge = content.get("sub_badge") or "🔴 BREAKING NEWS"
+    search_queries = content.get("search_queries") or []
+    ig_caption = content.get("ig_caption") or f"{headline}\n\n{description}\n\nFollow for daily breaking news updates."
+    hashtags = content.get("hashtags") or "#breakingnews #worldnews #reels #viral #trending #todaynews"
+
+    hooks_list = [
+        {
+            "layout": "reel_split",
+            "top_hook": headline,
+            "caption": description,
+            "sub_badge": sub_badge,
+            "vibe": "Breaking News"
+        },
+        {
+            "layout": "reel_chyron",
+            "top_hook": headline,
+            "caption": description,
+            "sub_badge": "🔴 LIVE TV REPORT",
+            "vibe": "Live Broadcast"
+        },
+        {
+            "layout": "reel_dark_humor",
+            "top_hook": headline,
+            "caption": description,
+            "sub_badge": "🔴 BREAKING NEWS",
+            "vibe": "News Reel"
+        },
+        {
+            "layout": "reel_glass_card",
+            "top_hook": headline,
+            "caption": description,
+            "sub_badge": "GLOBAL FEED",
+            "vibe": "POV News"
+        }
+    ]
+
+    return {
+        "headline": headline,
+        "description": description,
         "publisher": publisher,
         "category": category,
-        "source": "fallback",
-        "hooks": [
-            {
-                "layout": "reel_split",
-                "top_hook": "POV: YOU OPENED THE NEWS TODAY 💀",
-                "caption": title_clean,
-                "sub_badge": "WAIT TILL THE END 😭",
-                "vibe": "Breaking News"
-            },
-            {
-                "layout": "reel_chyron",
-                "top_hook": f"🔴 BREAKING: {publisher.upper() if publisher else 'LIVE REPORT'}",
-                "caption": title_clean,
-                "sub_badge": "HAPPENING RIGHT NOW",
-                "vibe": "Live TV"
-            },
-            {
-                "layout": "reel_reddit_story",
-                "top_hook": "What is a harsh truth nobody talks about?",
-                "caption": f"“{title_clean}”",
-                "sub_badge": "r/AskReddit 🤖",
-                "vibe": "Reddit Story"
-            },
-            {
-                "layout": "reel_dark_humor",
-                "top_hook": "Smiling through the existential dread 🙂",
-                "caption": title_clean,
-                "sub_badge": "DARK HUMOR 💀",
-                "vibe": "Dark Meme"
-            }
-        ],
-        "caption": f"POV: YOU OPENED THE NEWS TODAY 💀\n\n{title_clean}\n\nWe really living in an unscripted simulation at this point 😭\n\nTag a friend who needs to see this 👇",
-        "hashtags": "#memes #darkhumor #news #redditstories #trending #viral #reels"
+        "sub_badge": sub_badge,
+        "search_queries": search_queries,
+        "hooks": hooks_list,
+        "caption": ig_caption,
+        "hashtags": hashtags
     }
+
+
+def generate_batch_reel_hooks(articles, vibe="news"):
+    """
+    Extracts factual breaking news headlines, 2-3 line descriptions, and targeted video search queries for multiple news items.
+    """
+    results = []
+    for idx, item in enumerate(articles):
+        title = item.get("title", "").strip()
+        pub = item.get("publisher", "").strip()
+        cat = item.get("category", "").strip()
+        manual_url = item.get("manual_video_url", "").strip()
+        custom_layout = item.get("layout", "").strip()
+        related_cov = item.get("related_coverage", [])
+
+        hooks_data = generate_reel_hooks(title, pub, cat, vibe, related_coverage=related_cov)
+        headline = hooks_data.get("headline") or (f"BREAKING: {title}" if not title.upper().startswith("BREAKING") else title)
+        description = hooks_data.get("description") or title
+        sub_badge = hooks_data.get("sub_badge") or "🔴 BREAKING NEWS"
+        search_queries = hooks_data.get("search_queries") or []
+        hooks_list = hooks_data.get("hooks", [])
+        lead = hooks_list[0] if hooks_list else {}
+        chosen_layout = custom_layout or lead.get("layout") or "reel_split"
+
+        search_kw = search_queries[0] if search_queries else title[:35]
+        ig_caption = hooks_data.get("caption") or f"{headline}\n\n{description}\n\nStay tuned for real-time global news updates."
+        hashtags = hooks_data.get("hashtags") or "#news #reels #viral #trending #todaynews"
+
+        results.append({
+            "index": idx,
+            "title": title,
+            "publisher": pub,
+            "category": cat,
+            "top_hook": headline,
+            "description": description,
+            "sub_badge": sub_badge,
+            "layout": chosen_layout,
+            "search_query": search_kw,
+            "search_queries": search_queries,
+            "manual_video_url": manual_url,
+            "ig_caption": ig_caption,
+            "hashtags": hashtags,
+            "hooks": hooks_list
+        })
+    return results
 
 
 def check_video_has_audio(vid_path):
@@ -1640,29 +1816,51 @@ class NewsServerHandler(http.server.SimpleHTTPRequestHandler):
             content_length = int(self.headers.get("Content-Length", 0))
             post_body = self.rfile.read(content_length)
             try:
-                payload = json.loads(post_body.decode("utf-8"))
+                payload = json.loads(post_body.decode("utf-8"), strict=False)
             except Exception:
                 payload = {}
 
             title = payload.get("title", "")
             publisher = payload.get("publisher", "")
             category = payload.get("category", "")
-            vibe = payload.get("vibe", "dark")
-            return self.send_json(generate_reel_hooks(title, publisher, category, vibe))
+            vibe = payload.get("vibe", "news")
+            related_coverage = payload.get("related_coverage", [])
+            return self.send_json(generate_reel_hooks(title, publisher, category, vibe, related_coverage=related_coverage))
+
+        # Batch Generate Reel Hooks for multiple news items
+        if path == "/api/batch-reel-hooks":
+            content_length = int(self.headers.get("Content-Length", 0))
+            post_body = self.rfile.read(content_length)
+            try:
+                payload = json.loads(post_body.decode("utf-8"), strict=False)
+            except Exception:
+                payload = {}
+
+            articles = payload.get("articles", [])
+            vibe = payload.get("vibe", "news")
+            if not articles or not isinstance(articles, list):
+                return self.send_json({"error": "A list of articles is required for batch hook extraction"}, status=400)
+
+            batch_results = generate_batch_reel_hooks(articles, vibe=vibe)
+            return self.send_json({
+                "success": True,
+                "count": len(batch_results),
+                "items": batch_results
+            })
 
         # Generate viral Instagram caption with Groq AI
         if path == "/api/ai-caption":
             content_length = int(self.headers.get("Content-Length", 0))
             post_body = self.rfile.read(content_length)
             try:
-                payload = json.loads(post_body.decode("utf-8"))
+                payload = json.loads(post_body.decode("utf-8"), strict=False)
             except Exception:
                 payload = {}
 
             title = payload.get("title", "")
             publisher = payload.get("publisher", "")
             hook = payload.get("hook", "")
-            vibe = payload.get("vibe", "dark")
+            vibe = payload.get("vibe", "news")
             return self.send_json(generate_ai_caption(title, publisher, hook, vibe))
 
         # Fetch / Search Video Reel from Instagram, YouTube, or web
@@ -1670,12 +1868,13 @@ class NewsServerHandler(http.server.SimpleHTTPRequestHandler):
             content_length = int(self.headers.get("Content-Length", 0))
             post_body = self.rfile.read(content_length)
             try:
-                payload = json.loads(post_body.decode("utf-8"))
+                payload = json.loads(post_body.decode("utf-8"), strict=False)
             except Exception:
                 payload = {}
 
             source_url = payload.get("url", "").strip()
             query = payload.get("query", "").strip()
+            search_queries = payload.get("search_queries", [])
             mode = payload.get("type", "url")  # "url", "search", or "preset"
 
             if mode == "preset":
@@ -1691,7 +1890,11 @@ class NewsServerHandler(http.server.SimpleHTTPRequestHandler):
                 return self.send_json({"error": "URL or search query is required"}, status=400)
 
             try:
-                filename, title, vid_info = fetch_or_search_video(target, is_search=(mode == "search"))
+                filename, title, vid_info = fetch_or_search_video(
+                    target,
+                    is_search=(mode == "search"),
+                    related_queries=search_queries
+                )
                 return self.send_json({
                     "success": True,
                     "videoUrl": f"/api/serve-video?name={filename}",
@@ -2058,7 +2261,8 @@ class NewsServerHandler(http.server.SimpleHTTPRequestHandler):
 def run_server(port=PORT):
     server_address = ("", port)
     try:
-        httpd = http.server.HTTPServer(server_address, NewsServerHandler)
+        ServerClass = getattr(http.server, "ThreadingHTTPServer", http.server.HTTPServer)
+        httpd = ServerClass(server_address, NewsServerHandler)
         print(f"AI Memer & Reel Server running at http://localhost:{port}")
         print(f"Serving Web App from: {WEB_DIR}")
         print("Press Ctrl+C to stop.")

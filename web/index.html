@@ -125,6 +125,31 @@
           </div>
         </div>
 
+        <!-- Batch Reel Automation Action Bar -->
+        <div class="batch-action-bar" id="batchActionBar">
+          <div class="batch-bar-left">
+            <label class="batch-select-all-label" id="selectAllNewsLabel" title="Toggle Select All News">
+              <input type="checkbox" id="selectAllNewsCheckbox" class="batch-checkbox">
+              <span class="batch-checkbox-custom"></span>
+              <span class="batch-select-text">Select All News</span>
+            </label>
+            <span class="batch-count-pill" id="batchSelectedCountPill">0 selected</span>
+            <div class="batch-quick-actions">
+              <button type="button" class="batch-mini-btn" id="batchSelectAllBtn" title="Select all loaded news">All</button>
+              <button type="button" class="batch-mini-btn" id="batchSelectTop5Btn" title="Select top 5 news">Top 5</button>
+              <button type="button" class="batch-mini-btn" id="batchDeselectAllBtn" title="Clear selection">Clear</button>
+            </div>
+          </div>
+
+          <div class="batch-bar-right">
+            <button type="button" id="batchCreateReelsBtn" class="batch-action-btn sparkle-btn" onclick="openBatchReelModal()" title="Create 9:16 Video Reels for all selected news and post to Instagram">
+              <span class="btn-icon">🚀</span>
+              <span class="batch-btn-label">Create Reel for All & Post to Instagram</span>
+              <span class="batch-btn-count" id="batchBtnCountBadge" style="display: none;">0</span>
+            </button>
+          </div>
+        </div>
+
         <!-- News Feed Cards Container -->
         <div class="news-grid" id="newsGrid">
           <!-- Dynamically populated news cards -->
@@ -986,6 +1011,277 @@
           </div>
 
           <div id="igPublishResultBox" class="ig-publish-result" style="display: none;"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ======================================================================
+       MODAL 7: 1-Click Batch Reel Automation & Instagram Auto-Poster
+       ====================================================================== -->
+  <div class="modal-backdrop is-hidden" id="batchReelModal" style="display: none !important;">
+    <div class="modal-window batch-modal-window">
+      <div class="modal-header batch-modal-header">
+        <div class="modal-title-group">
+          <div class="batch-title-row">
+            <span class="batch-modal-icon">🚀</span>
+            <h2 class="modal-title">Batch Reel Studio & Instagram Auto-Poster</h2>
+            <span class="batch-live-tag">1-CLICK WORKFLOW</span>
+          </div>
+          <span class="modal-subtitle">Generate 9:16 viral video reels for all selected news and auto-publish one-by-one to Instagram</span>
+        </div>
+        <button id="closeBatchReelBtn" class="modal-close-btn" title="Close Batch Studio" onclick="closeBatchReelModal()">✕</button>
+      </div>
+
+      <div class="modal-body batch-modal-body">
+        <!-- SCREEN 1: Setup & Configuration -->
+        <div id="batchScreenSetup" class="batch-screen active">
+          <!-- Selected News Count & Preview Strip -->
+          <div class="batch-selection-banner">
+            <div class="batch-selection-info">
+              <span class="batch-selection-badge" id="batchModalCountBadge">0 Stories Selected</span>
+              <span class="batch-selection-desc">Review your selected news items or adjust automation options below:</span>
+            </div>
+            <div class="batch-articles-scroll" id="batchArticlesPreviewList">
+              <!-- Populated dynamically with selected news items -->
+            </div>
+          </div>
+
+          <div class="batch-settings-grid">
+            <!-- Video Source Card -->
+            <div class="batch-setting-card">
+              <div class="batch-card-header">
+                <span class="card-icon">🎬</span>
+                <div class="card-header-text">
+                  <h3>Background Video Footage Source</h3>
+                  <p>How video footage will be fetched for each 9:16 Reel</p>
+                </div>
+              </div>
+
+              <div class="batch-radio-group">
+                <label class="batch-radio-label active" id="videoSourceAutoLabel">
+                  <input type="radio" name="batchVideoSource" value="auto" id="batchVideoSourceAuto" checked>
+                  <div class="radio-content">
+                    <div class="radio-title-row">
+                      <span class="radio-icon">🤖</span>
+                      <strong>Auto-Search Web & YouTube (Default & Recommended)</strong>
+                    </div>
+                    <p class="radio-desc">AI extracts topic keywords from news headline & description to automatically fetch matching HD 9:16 vertical clips from YouTube/web for each story.</p>
+                  </div>
+                </label>
+
+                <label class="batch-radio-label" id="videoSourceManualLabel">
+                  <input type="radio" name="batchVideoSource" value="manual" id="batchVideoSourceManual">
+                  <div class="radio-content">
+                    <div class="radio-title-row">
+                      <span class="radio-icon">🔗</span>
+                      <strong>Custom Video URL for All Reels (Manual Mode)</strong>
+                    </div>
+                    <p class="radio-desc">Paste a single YouTube Shorts, Instagram Reel, TikTok, or direct MP4 URL to use as footage for all reels in this batch.</p>
+                    <div class="manual-url-input-wrap" id="batchManualUrlWrap" style="display: none;">
+                      <input type="url" id="batchGlobalManualUrl" class="styled-input batch-url-input" placeholder="https://www.youtube.com/shorts/... or direct MP4 link">
+                    </div>
+                  </div>
+                </label>
+              </div>
+            </div>
+
+            <!-- Pattern Strategy Card -->
+            <div class="batch-setting-card">
+              <div class="batch-card-header">
+                <span class="card-icon">🎨</span>
+                <div class="card-header-text">
+                  <h3>Viral Pattern Distribution</h3>
+                  <p>Apply our 20+ viral meme patterns across selected stories</p>
+                </div>
+              </div>
+
+              <div class="pattern-strategy-select-wrap">
+                <label for="batchPatternStrategy" class="control-label">Pattern Strategy:</label>
+                <select id="batchPatternStrategy" class="styled-select batch-select">
+                  <option value="cycle" selected>🔄 Cycle All 20+ Viral Patterns (Split News, TV Chyron, Dark Meme, Glitch, Tweet Dark, etc.)</option>
+                  <option value="random">🎲 Randomize Viral Patterns</option>
+                  <option value="reel_split">📰 Split-Screen Breaking News Card</option>
+                  <option value="reel_chyron">🔴 Live Broadcast TV Chyron & Ticker</option>
+                  <option value="reel_dark_humor">💀 Existential Dark Meme</option>
+                  <option value="reel_unusual_whales">🐋 Market & Financial Satire Card</option>
+                  <option value="reel_fake_notification">🔔 Viral Push Notification Alert</option>
+                  <option value="reel_tweet_dark">🐦 OLED Dark Mode Viral Tweet</option>
+                  <option value="reel_simulation_glitch">⚡ Simulation Glitch Matrix</option>
+                  <option value="reel_reddit_story">🤖 r/AskReddit Storytime Card</option>
+                  <option value="reel_savage_reality">🔥 Savage Reality Check</option>
+                  <option value="reel_retro_vhs">📼 Retro 90s VHS Camcorder</option>
+                  <option value="reel_neon_cyberpunk">🌆 Cyberpunk 2077 HUD</option>
+                </select>
+              </div>
+
+              <div class="pattern-preview-chips" id="batchPatternPreviewChips">
+                <span class="pattern-chip">Split News</span>
+                <span class="pattern-chip">TV Chyron</span>
+                <span class="pattern-chip">Dark Meme</span>
+                <span class="pattern-chip">Unusual Whales</span>
+                <span class="pattern-chip">Push Alert</span>
+                <span class="pattern-chip">Dark Tweet</span>
+                <span class="pattern-chip">Matrix Glitch</span>
+                <span class="pattern-chip">Reddit Story</span>
+              </div>
+            </div>
+
+            <!-- Instagram Auto-Post Card -->
+            <div class="batch-setting-card">
+              <div class="batch-card-header">
+                <span class="card-icon">📸</span>
+                <div class="card-header-text">
+                  <h3>Instagram Direct Auto-Publish</h3>
+                  <p>Automatically post reels one-by-one without manual intervention</p>
+                </div>
+              </div>
+
+              <div class="ig-batch-toggle-row">
+                <label class="switch-label">
+                  <input type="checkbox" id="batchAutoPostIgToggle" class="switch-checkbox" checked>
+                  <span class="switch-slider"></span>
+                  <span class="switch-text">Auto-publish each rendered Reel directly to Instagram Reels</span>
+                </label>
+              </div>
+
+              <div class="ig-connection-banner" id="batchIgStatusBanner">
+                <div class="ig-status-connected" id="batchIgConnectedBox" style="display: none;">
+                  <span class="status-indicator-dot online"></span>
+                  <span>Publishing directly to: <strong id="batchIgUsernameLabel">@youraccount</strong></span>
+                </div>
+                <div class="ig-status-disconnected" id="batchIgDisconnectedBox">
+                  <span class="status-indicator-dot offline"></span>
+                  <span>Instagram is not connected. Reels will be rendered & saved locally, or you can <button type="button" class="link-btn" onclick="openInstagramModal()">Connect Instagram Now</button>.</span>
+                </div>
+              </div>
+
+              <div class="post-delay-row" id="batchPostDelayRow">
+                <label for="batchPostDelaySelect" class="control-label">Delay between posts (Rate limit safety):</label>
+                <select id="batchPostDelaySelect" class="styled-select batch-select-small">
+                  <option value="5">5 seconds (Fast)</option>
+                  <option value="10" selected>10 seconds (Recommended)</option>
+                  <option value="15">15 seconds (Safe)</option>
+                  <option value="30">30 seconds (Ultra-safe)</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <!-- Footer Action Button -->
+          <div class="batch-modal-footer">
+            <button type="button" class="secondary-btn" onclick="closeBatchReelModal()">Cancel</button>
+            <button type="button" id="startBatchWorkflowBtn" class="sparkle-btn batch-start-btn" onclick="startBatchWorkflow()">
+              <span class="btn-icon">⚡</span>
+              <span>Start 1-Click Automated Workflow (<span id="startBatchCount">0</span> Reels)</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- SCREEN 2: Live Pipeline Runner -->
+        <div id="batchScreenRunning" class="batch-screen" style="display: none;">
+          <div class="runner-header-card">
+            <div class="runner-status-row">
+              <div class="runner-status-left">
+                <span class="pulse-dot"></span>
+                <span class="runner-title" id="runnerHeadlineStatus">Automated Reel Pipeline Active</span>
+              </div>
+              <span class="runner-counter-pill" id="runnerCounterPill">Reel 1 of 5 (20%)</span>
+            </div>
+
+            <!-- Animated Progress Bar -->
+            <div class="batch-overall-progress-bar">
+              <div class="batch-overall-progress-fill" id="batchOverallProgressFill" style="width: 0%;"></div>
+            </div>
+            <div class="runner-subtext-row">
+              <span id="runnerSubtext">Initializing automated pipeline...</span>
+              <span id="runnerTimeText">Time elapsed: 0s</span>
+            </div>
+          </div>
+
+          <!-- Active Story In Progress Card -->
+          <div class="runner-current-item-card" id="runnerCurrentCard">
+            <div class="current-card-header">
+              <span class="current-badge">NOW PROCESSING</span>
+              <span class="current-pattern-badge" id="currentPatternBadge">🎬 Split-Screen Breaking News</span>
+            </div>
+            <h3 class="current-story-title" id="currentStoryTitle">Loading story headline...</h3>
+
+            <!-- 4-Step Animated Pipeline Tracker -->
+            <div class="pipeline-stepper">
+              <div class="step-node" id="step1Node">
+                <div class="step-circle"><span class="step-icon">🔍</span></div>
+                <div class="step-label">1. Hook & Description</div>
+              </div>
+              <div class="step-line" id="stepLine1"></div>
+              <div class="step-node" id="step2Node">
+                <div class="step-circle"><span class="step-icon">🎬</span></div>
+                <div class="step-label">2. Video Footage</div>
+              </div>
+              <div class="step-line" id="stepLine2"></div>
+              <div class="step-node" id="step3Node">
+                <div class="step-circle"><span class="step-icon">🎨</span></div>
+                <div class="step-label">3. Render HD Reel</div>
+              </div>
+              <div class="step-line" id="stepLine3"></div>
+              <div class="step-node" id="step4Node">
+                <div class="step-circle"><span class="step-icon">📸</span></div>
+                <div class="step-label">4. Post Instagram</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Real-Time Items Queue & Feed -->
+          <div class="runner-queue-section">
+            <h4 class="runner-queue-title">Batch Progress Queue</h4>
+            <div class="runner-queue-list" id="runnerQueueList">
+              <!-- Dynamically populated with each item's live status card -->
+            </div>
+          </div>
+
+          <div class="runner-footer-actions">
+            <button type="button" id="stopBatchBtn" class="danger-btn" onclick="stopBatchWorkflow()">
+              <span>🛑 Stop Automation</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- SCREEN 3: Completion Summary -->
+        <div id="batchScreenSummary" class="batch-screen" style="display: none;">
+          <div class="summary-hero">
+            <div class="summary-celebration-icon">🎉</div>
+            <h2 class="summary-title">Batch Automation Completed Successfully!</h2>
+            <p class="summary-subtitle" id="summaryStatsText">All selected reels have been created and published.</p>
+
+            <div class="summary-stats-grid">
+              <div class="stat-pill-card">
+                <span class="stat-num" id="statReelsCreated">0</span>
+                <span class="stat-lbl">9:16 Reels Rendered</span>
+              </div>
+              <div class="stat-pill-card">
+                <span class="stat-num" id="statReelsPosted">0</span>
+                <span class="stat-lbl">Published to Instagram</span>
+              </div>
+              <div class="stat-pill-card">
+                <span class="stat-num" id="statPatternsUsed">0</span>
+                <span class="stat-lbl">Patterns Cycled</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Gallery of Generated Reels -->
+          <div class="summary-results-gallery">
+            <h3 class="gallery-title">Generated Reels & Instagram Posts</h3>
+            <div class="summary-gallery-grid" id="summaryGalleryGrid">
+              <!-- Dynamic cards with video thumbnail, Instagram reel link, download button -->
+            </div>
+          </div>
+
+          <div class="summary-footer-actions">
+            <button type="button" class="primary-btn" onclick="closeBatchReelModal()">
+              <span>✨ Done & Return to Feed</span>
+            </button>
+          </div>
         </div>
       </div>
     </div>
