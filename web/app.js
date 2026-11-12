@@ -331,6 +331,28 @@ function init() {
   setMobileViewMode('feed');
   loadNewsFeed();
   checkInstagramStatus();
+  checkBackgroundBatchStatus();
+}
+
+async function checkBackgroundBatchStatus() {
+  try {
+    const res = await fetch('/api/batch-worker/status');
+    if (!res.ok) return;
+    const status = await res.json();
+    if (status && status.is_running) {
+      console.log('[APP] Re-attaching to active Termux background batch workflow...');
+      openBatchReelModal();
+      if (elements.batchScreenSetup) elements.batchScreenSetup.style.display = 'none';
+      if (elements.batchScreenRunning) elements.batchScreenRunning.style.display = 'block';
+      if (elements.batchScreenSummary) elements.batchScreenSummary.style.display = 'none';
+      batchState.isRunning = true;
+      if (batchState.pollInterval) clearInterval(batchState.pollInterval);
+      batchState.pollInterval = setInterval(pollBatchWorkerStatus, 1500);
+      pollBatchWorkerStatus();
+    }
+  } catch (e) {
+    // Ignore on startup
+  }
 }
 
 function setupEventListeners() {
@@ -5402,6 +5424,25 @@ function stopBatchWorkflow() {
   showToast('Batch automation stopped', 'warning');
 }
 
+// Screen Wake Lock helper for mobile browser support
+let screenWakeLock = null;
+async function requestScreenWakeLock() {
+  try {
+    if ('wakeLock' in navigator) {
+      screenWakeLock = await navigator.wakeLock.request('screen');
+      console.log('[WAKE_LOCK] Screen wake lock active');
+    }
+  } catch (err) {
+    console.warn('[WAKE_LOCK] Note:', err);
+  }
+}
+function releaseScreenWakeLock() {
+  if (screenWakeLock) {
+    screenWakeLock.release().catch(() => {});
+    screenWakeLock = null;
+  }
+}
+
 async function startBatchWorkflow() {
   const selectedList = Array.from(state.selectedNewsForBatch.values());
   if (selectedList.length === 0) {
@@ -5415,267 +5456,210 @@ async function startBatchWorkflow() {
   const patternStrategy = elements.batchPatternStrategy?.value || 'cycle';
   const autoPostIg = elements.batchAutoPostIgToggle ? elements.batchAutoPostIgToggle.checked : true;
   const postDelaySec = parseInt(elements.batchPostDelaySelect?.value || '10', 10);
+  const speedQuality = document.getElementById('batchSpeedSelect')?.value || 'fast_720';
 
-  // Initialize batch state
-  batchState.isRunning = true;
-  batchState.startTime = Date.now();
-  batchState.results = [];
-  batchState.queue = selectedList.map((art, idx) => ({
-    article: art,
-    index: idx,
-    pattern: getPatternForIndex(patternStrategy, idx),
-    manualUrl: art.manualVideoUrl || (isManualSource ? globalManualUrl : ''),
-    status: 'queued',
-    stepText: 'Queued...',
-    videoUrl: '',
-    postUrl: '',
-    renderedFilename: '',
-    errorMsg: ''
-  }));
+  showToast('⚡ Pre-rendering overlays & starting Termux background worker...', 'info');
 
-  // Switch to Screen 2 (Running)
+  // Pre-generate 9:16 layout overlays for each selected news story
+  const preparedItems = selectedList.map((art, idx) => {
+    const pattern = getPatternForIndex(patternStrategy, idx);
+    const rawTitle = (art.title || '').trim();
+    const defaultHeadline = rawTitle.toUpperCase().startsWith('BREAKING') ? rawTitle : `BREAKING: ${rawTitle}`;
+    const topHook = defaultHeadline;
+    const description = rawTitle;
+    const subBadge = '🔴 BREAKING NEWS';
+
+    const overlayPng = getReelOverlayDataUrl({
+      layout: pattern,
+      topHook: topHook,
+      caption: description,
+      publisher: art.publisher || 'TODAY MEMER',
+      subBadge: subBadge,
+      quality: speedQuality === 'hd1080' ? 'hd1080' : 'fast_720'
+    });
+
+    return {
+      index: idx,
+      title: rawTitle,
+      publisher: art.publisher || '',
+      category: state.currentTopic || '',
+      pattern: pattern,
+      manualUrl: art.manualVideoUrl || (isManualSource ? globalManualUrl : ''),
+      overlay: overlayPng,
+      topHook: topHook,
+      caption: description,
+      igCaption: `${topHook}\n\n${description}\n\nStay tuned for real-time global news updates.\n\n#breakingnews #news #reels`,
+      hashtags: '#breakingnews #worldnews #reels #viral #trending #todaynews'
+    };
+  });
+
+  // Switch to Screen 2 (Running) immediately
   if (elements.batchScreenSetup) elements.batchScreenSetup.style.display = 'none';
   if (elements.batchScreenRunning) elements.batchScreenRunning.style.display = 'block';
   if (elements.batchScreenSummary) elements.batchScreenSummary.style.display = 'none';
 
-  if (batchState.timerInterval) clearInterval(batchState.timerInterval);
-  batchState.timerInterval = setInterval(updateRunnerTimer, 1000);
+  batchState.isRunning = true;
+  batchState.startTime = Date.now();
+  batchState.results = [];
+  batchState.items = preparedItems;
 
-  // Render Queue Table
-  renderRunnerQueue();
+  // Request screen wake lock while browser is open
+  await requestScreenWakeLock();
 
-  const total = batchState.queue.length;
-
-  for (let i = 0; i < total; i++) {
-    if (!batchState.isRunning) break;
-
-    const item = batchState.queue[i];
-    item.status = 'working';
-    renderRunnerQueue();
-
-    // Update Overall Progress Bar
-    const progressPct = Math.round((i / total) * 100);
-    if (elements.batchOverallProgressFill) elements.batchOverallProgressFill.style.width = `${progressPct}%`;
-    if (elements.runnerCounterPill) elements.runnerCounterPill.textContent = `Reel ${i + 1} of ${total} (${progressPct}%)`;
-    if (elements.runnerHeadlineStatus) elements.runnerHeadlineStatus.textContent = `Processing story ${i + 1} of ${total}`;
-    if (elements.currentStoryTitle) elements.currentStoryTitle.textContent = item.article.title;
-    if (elements.currentPatternBadge) elements.currentPatternBadge.textContent = `🎬 Pattern: ${formatPatternName(item.pattern)}`;
-
-    try {
-      // STEP 1: Extract Factual News Headline, 2-3 Line Description & Video Search Queries
-      setPipelineStep(1);
-      if (elements.runnerSubtext) elements.runnerSubtext.textContent = 'Step 1/4: Synthesizing breaking headline & 2-3 line news summary...';
-      item.stepText = 'Extracting news story...';
-      renderRunnerQueue();
-
-      let hookData = null;
-      try {
-        const hookRes = await fetch('/api/reel-hooks', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            title: item.article.title,
-            publisher: item.article.publisher || '',
-            category: state.currentTopic || '',
-            vibe: 'news',
-            related_coverage: item.article.related_coverage || []
-          })
-        });
-        hookData = await hookRes.json();
-      } catch (err) {
-        console.warn('[BATCH] AI hook fallback:', err);
-      }
-
-      const rawTitle = item.article.title.trim();
-      const defaultHeadline = rawTitle.toUpperCase().startsWith('BREAKING') ? rawTitle : `BREAKING: ${rawTitle}`;
-      const topHook = hookData?.headline || hookData?.hooks?.[0]?.top_hook || defaultHeadline;
-      const description = hookData?.description || hookData?.hooks?.[0]?.caption || item.article.title;
-      const subBadge = hookData?.sub_badge || '🔴 BREAKING NEWS';
-      const searchQueries = hookData?.search_queries || [];
-      const igCaption = hookData?.ig_caption || `${topHook}\n\n${description}\n\nStay tuned for real-time global news updates.\n\n#breakingnews #news #reels`;
-      const hashtags = hookData?.hashtags || '#breakingnews #worldnews #reels #viral #trending #todaynews';
-
-      if (!batchState.isRunning) break;
-
-      // STEP 2: Fetch Relatable Video Footage from Internet or Custom URL
-      setPipelineStep(2);
-      if (elements.runnerSubtext) elements.runnerSubtext.textContent = item.manualUrl 
-        ? 'Step 2/4: Fetching custom background video from URL...'
-        : 'Step 2/4: Searching YouTube for relatable news footage & CCTV/b-roll...';
-      item.stepText = 'Fetching relatable video...';
-      renderRunnerQueue();
-
-      const videoPayload = item.manualUrl
-        ? { type: 'url', url: item.manualUrl }
-        : {
-            type: 'search',
-            query: item.article.title,
-            search_queries: searchQueries
-          };
-
-      let videoFilename = 'sample_reel.mp4';
-      try {
-        const fetchVidRes = await fetch('/api/fetch-reel-video', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(videoPayload)
-        });
-        const vidJson = await fetchVidRes.json();
-        if (vidJson.success && vidJson.videoUrl) {
-          const match = vidJson.videoUrl.match(/name=([^&]+)/);
-          if (match) videoFilename = decodeURIComponent(match[1]);
-        }
-      } catch (vfErr) {
-        console.warn('[BATCH] Video fetch fallback to sample_reel:', vfErr);
-      }
-
-      if (!batchState.isRunning) break;
-
-      // STEP 3: Render 9:16 HD Reel with Pattern Overlay
-      setPipelineStep(3);
-      if (elements.runnerSubtext) elements.runnerSubtext.textContent = `Step 3/4: Compositing 9:16 Full HD Reel with pattern: ${formatPatternName(item.pattern)}...`;
-      item.stepText = 'Rendering 9:16 HD Reel...';
-      renderRunnerQueue();
-
-      const overlayPng = getReelOverlayDataUrl({
-        layout: item.pattern,
-        topHook: topHook,
-        caption: description,
-        publisher: item.article.publisher || 'TODAY MEMER',
-        subBadge: subBadge,
-        quality: 'hd1080'
-      });
-
-      const renderRes = await fetch('/api/render-reel-video', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          video_name: videoFilename,
-          overlay: overlayPng,
-          layout: item.pattern,
-          duration: 12,
-          quality: 'hd1080',
-          color_grade: 'none'
-        })
-      });
-      const renderJson = await renderRes.json();
-      if (!renderRes.ok || !renderJson.success) {
-        throw new Error(renderJson.error || 'Failed to render 9:16 video');
-      }
-
-      item.renderedFilename = renderJson.filename;
-      item.videoUrl = renderJson.videoUrl;
-
-      if (!batchState.isRunning) break;
-
-      // STEP 4: Direct Auto-Publish to Instagram Reels
-      setPipelineStep(4);
-      if (autoPostIg && igState.connected) {
-        if (elements.runnerSubtext) elements.runnerSubtext.textContent = 'Step 4/4: Uploading and publishing 9:16 Reel to Instagram...';
-        item.stepText = 'Publishing to Instagram...';
-        renderRunnerQueue();
-
-        try {
-          const igRes = await fetch('/api/instagram/publish-reel', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              video_name: item.renderedFilename,
-              overlay: overlayPng,
-              layout: item.pattern,
-              caption: igCaption,
-              hashtags: hashtags
-            })
-          });
-          const igJson = await igRes.json();
-          if (igRes.ok && igJson.success) {
-            item.postUrl = igJson.post_url || igJson.reel_url;
-            item.stepText = 'Published on Instagram!';
-          } else {
-            console.warn('[BATCH] Instagram publish note:', igJson.error);
-            item.errorMsg = igJson.error || 'Instagram upload note';
-            item.stepText = 'Rendered (IG upload skipped)';
-          }
-        } catch (igErr) {
-          console.warn('[BATCH] Instagram publish error:', igErr);
-          item.errorMsg = igErr.message;
-          item.stepText = 'Rendered (IG skipped)';
-        }
-      } else {
-        item.stepText = 'Rendered & Saved Locally';
-      }
-
-      item.status = 'done';
-      batchState.results.push(item);
-      renderRunnerQueue();
-
-      // Pause delay between Instagram posts
-      if (autoPostIg && igState.connected && i < total - 1) {
-        for (let s = postDelaySec; s > 0; s--) {
-          if (!batchState.isRunning) break;
-          if (elements.runnerSubtext) {
-            elements.runnerSubtext.textContent = `⏳ Waiting ${s}s before next post to respect Instagram limits...`;
-          }
-          await new Promise(r => setTimeout(r, 1000));
-        }
-      }
-
-    } catch (storyErr) {
-      console.error(`[BATCH] Error on story ${i + 1}:`, storyErr);
-      item.status = 'error';
-      item.errorMsg = storyErr.message || 'Workflow error';
-      item.stepText = `Failed: ${item.errorMsg.slice(0, 30)}`;
-      batchState.results.push(item);
-      renderRunnerQueue();
+  // Kick off Server-Side Background Task in Termux / Python
+  try {
+    const res = await fetch('/api/batch-worker/start', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        items: preparedItems,
+        auto_post_ig: autoPostIg,
+        post_delay_sec: postDelaySec,
+        quality: speedQuality
+      })
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      throw new Error(data.error || 'Failed to start background batch task on server');
     }
+    showToast('🚀 Termux background worker running! Safe to lock phone or switch apps.', 'success');
+  } catch (err) {
+    console.error('[BATCH] Server worker start error:', err);
+    showToast(`Error starting worker: ${err.message}`, 'error');
   }
 
-  // Finalize Workflow
-  if (batchState.timerInterval) {
-    clearInterval(batchState.timerInterval);
-    batchState.timerInterval = null;
-  }
-
-  if (elements.batchOverallProgressFill) elements.batchOverallProgressFill.style.width = '100%';
-  setPipelineStep(4);
-
-  // Switch to Screen 3 (Summary)
-  showBatchSummaryScreen();
+  // Start polling server status
+  if (batchState.pollInterval) clearInterval(batchState.pollInterval);
+  batchState.pollInterval = setInterval(pollBatchWorkerStatus, 1500);
+  pollBatchWorkerStatus();
 }
 
-function renderRunnerQueue() {
+async function stopBatchWorkflow() {
+  try {
+    const res = await fetch('/api/batch-worker/stop', { method: 'POST' });
+    const data = await res.json();
+    showToast('🛑 Stopping batch workflow...', 'warning');
+  } catch (err) {
+    console.warn('Stop batch error:', err);
+  }
+}
+
+async function pollBatchWorkerStatus() {
+  try {
+    const res = await fetch('/api/batch-worker/status');
+    if (!res.ok) return;
+    const status = await res.json();
+
+    const total = status.total || (batchState.items ? batchState.items.length : 1);
+    const results = status.results || [];
+    const completedCount = results.length;
+    const progressPct = Math.round((completedCount / total) * 100);
+
+    if (elements.batchOverallProgressFill) {
+      elements.batchOverallProgressFill.style.width = `${progressPct}%`;
+    }
+    if (elements.runnerCounterPill) {
+      elements.runnerCounterPill.textContent = `Reel ${Math.min(total, status.current_index + 1)} of ${total} (${progressPct}%)`;
+    }
+    if (elements.runnerHeadlineStatus) {
+      elements.runnerHeadlineStatus.textContent = status.is_running 
+        ? `Processing story ${status.current_index + 1} of ${total}`
+        : (status.stop_requested ? 'Batch stopped by user' : 'Batch Completed');
+    }
+    if (elements.currentStoryTitle && status.current_title) {
+      elements.currentStoryTitle.textContent = status.current_title;
+    }
+    if (elements.currentPatternBadge && status.current_pattern) {
+      elements.currentPatternBadge.textContent = `🎬 Pattern: ${formatPatternName(status.current_pattern)}`;
+    }
+    if (elements.runnerSubtext && status.step_text) {
+      elements.runnerSubtext.textContent = status.step_text;
+    }
+    if (elements.runnerTimeText && status.elapsed_seconds !== undefined) {
+      elements.runnerTimeText.textContent = `Time elapsed: ${status.elapsed_seconds}s`;
+    }
+
+    if (status.step) {
+      setPipelineStep(status.step);
+    }
+
+    // Render live queue
+    renderServerRunnerQueue(status);
+
+    // If batch finished, transition to Summary Screen
+    if (!status.is_running && results.length > 0) {
+      if (batchState.pollInterval) {
+        clearInterval(batchState.pollInterval);
+        batchState.pollInterval = null;
+      }
+      releaseScreenWakeLock();
+      batchState.isRunning = false;
+      batchState.results = results;
+      setPipelineStep(4);
+      if (elements.batchOverallProgressFill) elements.batchOverallProgressFill.style.width = '100%';
+      showBatchSummaryScreen();
+    }
+  } catch (err) {
+    console.warn('[BATCH] Status poll error:', err);
+  }
+}
+
+function renderServerRunnerQueue(status) {
   if (!elements.runnerQueueList) return;
   elements.runnerQueueList.innerHTML = '';
 
-  batchState.queue.forEach((item, idx) => {
-    const card = document.createElement('div');
-    card.className = `runner-item-card${item.status === 'working' ? ' is-processing' : ''}${item.status === 'done' ? ' is-done' : ''}`;
+  const total = status.total || (batchState.items ? batchState.items.length : 0);
+  const results = status.results || [];
+  const resultsMap = new Map();
+  results.forEach(r => {
+    if (r.title) resultsMap.set(r.title, r);
+  });
 
+  const items = batchState.items || [];
+
+  for (let idx = 0; idx < total; idx++) {
+    const item = items[idx] || (results[idx] ? results[idx] : { title: `Story #${idx + 1}`, pattern: 'reel_split' });
+    const title = item.title || `Story #${idx + 1}`;
+    const pattern = item.pattern || 'reel_split';
+    const finishedResult = resultsMap.get(title) || results[idx];
+
+    let statusType = 'queued';
     let badgeClass = 'queued';
     let badgeText = '⏳ Queued';
-    if (item.status === 'working') {
+    let postUrl = '';
+    let videoUrl = '';
+
+    if (finishedResult && (finishedResult.status === 'done' || finishedResult.status === 'error')) {
+      statusType = finishedResult.status;
+      postUrl = finishedResult.post_url || finishedResult.postUrl || '';
+      videoUrl = finishedResult.video_url || finishedResult.videoUrl || '';
+      if (statusType === 'done') {
+        badgeClass = 'done';
+        badgeText = postUrl ? '✅ Published on IG' : '✅ Reel Rendered';
+      } else {
+        badgeClass = 'error';
+        badgeText = '❌ Failed';
+      }
+    } else if (status.is_running && idx === status.current_index) {
+      statusType = 'working';
       badgeClass = 'working';
-      badgeText = `⚡ ${item.stepText || 'Processing...'}`;
-    } else if (item.status === 'done') {
-      badgeClass = 'done';
-      badgeText = item.postUrl ? '✅ Published on IG' : '✅ Reel Rendered';
-    } else if (item.status === 'error') {
-      badgeClass = 'error';
-      badgeText = '❌ Failed';
+      badgeText = `⚡ ${status.step_text || 'Processing in Termux...'}`;
     }
 
     let linkHtml = '';
-    if (item.postUrl) {
-      linkHtml = `<a href="${escapeHtml(item.postUrl)}" target="_blank" rel="noopener noreferrer" class="runner-item-link">View IG ↗</a>`;
-    } else if (item.videoUrl) {
-      linkHtml = `<a href="${escapeHtml(item.videoUrl)}" target="_blank" download="reel_${idx+1}.mp4" class="runner-item-link">Download ⬇</a>`;
+    if (postUrl) {
+      linkHtml = `<a href="${escapeHtml(postUrl)}" target="_blank" rel="noopener noreferrer" class="runner-item-link">View IG ↗</a>`;
+    } else if (videoUrl) {
+      linkHtml = `<a href="${escapeHtml(videoUrl)}" target="_blank" download="reel_${idx+1}.mp4" class="runner-item-link">Download ⬇</a>`;
     }
 
+    const card = document.createElement('div');
+    card.className = `runner-item-card${statusType === 'working' ? ' is-processing' : ''}${statusType === 'done' ? ' is-done' : ''}`;
     card.innerHTML = `
       <div class="runner-item-left">
         <span class="runner-item-num">#${idx + 1}</span>
-        <span class="runner-item-title" title="${escapeHtml(item.article.title)}">${escapeHtml(item.article.title)}</span>
-        <span class="runner-item-pattern">${formatPatternName(item.pattern)}</span>
+        <span class="runner-item-title" title="${escapeHtml(title)}">${escapeHtml(title)}</span>
+        <span class="runner-item-pattern">${formatPatternName(pattern)}</span>
       </div>
       <div style="display: flex; align-items: center; gap: 8px;">
         <span class="runner-item-status-badge ${badgeClass}">${badgeText}</span>
@@ -5683,7 +5667,7 @@ function renderRunnerQueue() {
       </div>
     `;
     elements.runnerQueueList.appendChild(card);
-  });
+  }
 }
 
 function showBatchSummaryScreen() {
@@ -5692,8 +5676,8 @@ function showBatchSummaryScreen() {
   if (elements.batchScreenSummary) elements.batchScreenSummary.style.display = 'block';
 
   const total = batchState.results.length;
-  const posted = batchState.results.filter(r => r.postUrl).length;
-  const rendered = batchState.results.filter(r => r.renderedFilename).length;
+  const posted = batchState.results.filter(r => r.post_url || r.postUrl).length;
+  const rendered = batchState.results.filter(r => r.rendered_filename || r.renderedFilename || r.video_url || r.videoUrl).length;
   const uniquePatterns = new Set(batchState.results.map(r => r.pattern)).size;
 
   if (elements.statReelsCreated) elements.statReelsCreated.textContent = rendered;
@@ -5710,23 +5694,28 @@ function showBatchSummaryScreen() {
   if (elements.summaryGalleryGrid) {
     elements.summaryGalleryGrid.innerHTML = '';
     batchState.results.forEach((res, i) => {
-      if (!res.renderedFilename && !res.videoUrl) return;
+      const vid = res.video_url || res.videoUrl || (res.rendered_filename ? `/api/serve-video?name=${res.rendered_filename}` : '');
+      const post = res.post_url || res.postUrl;
+      const title = res.title || (res.article ? res.article.title : `Reel #${i+1}`);
+      const pattern = res.pattern || 'reel_split';
+
+      if (!vid && !post) return;
       const card = document.createElement('div');
       card.className = 'gallery-card';
 
-      const igBtn = res.postUrl
-        ? `<a href="${escapeHtml(res.postUrl)}" target="_blank" rel="noopener noreferrer" class="gallery-ig-link">📸 View on Instagram ↗</a>`
+      const igBtn = post
+        ? `<a href="${escapeHtml(post)}" target="_blank" rel="noopener noreferrer" class="gallery-ig-link">📸 View on Instagram ↗</a>`
         : `<span style="font-size: 11px; color: var(--text-dim);">Saved locally</span>`;
 
       card.innerHTML = `
         <div class="gallery-card-top">
-          <span class="gallery-card-pattern">🎬 ${formatPatternName(res.pattern)}</span>
+          <span class="gallery-card-pattern">🎬 ${formatPatternName(pattern)}</span>
           <span style="font-size: 11px; color: var(--accent-cyan); font-weight: 700;">#${i + 1}</span>
         </div>
-        <div class="gallery-card-title">${escapeHtml(res.article.title)}</div>
+        <div class="gallery-card-title">${escapeHtml(title)}</div>
         <div class="gallery-card-actions">
           ${igBtn}
-          <a href="${escapeHtml(res.videoUrl || `/api/serve-video?name=${res.renderedFilename}`)}" target="_blank" download="reel_${i+1}.mp4" class="gallery-download-btn">⬇ MP4</a>
+          ${vid ? `<a href="${escapeHtml(vid)}" target="_blank" download="reel_${i+1}.mp4" class="gallery-download-btn">⬇ MP4</a>` : ''}
         </div>
       `;
       elements.summaryGalleryGrid.appendChild(card);
@@ -5735,6 +5724,14 @@ function showBatchSummaryScreen() {
 
   showToast(`🎉 Batch automation complete: ${rendered} reels rendered!`, 'success');
 }
+
+// Background sync on visibilitychange (when phone unlocks or user switches back to browser tab)
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden && batchState.isRunning) {
+    console.log('[APP] App resumed from background/screen lock - syncing live status from Termux...');
+    pollBatchWorkerStatus();
+  }
+});
 
 // Global window helpers for inline HTML onclick handlers
 window.openStudioModal = openStudioModal;

@@ -134,3 +134,6 @@ instagram_session.json
 # Heavy downloaded/rendered media files (prevents pushing 300MB+ to GitHub)
 media/videos/*
 !media/videos/.gitkeep
+ad_assets/
+demo_assets/
+*.mp4

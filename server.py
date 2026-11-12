@@ -5,6 +5,7 @@ import random
 import re
 import sys
 import time
+import threading
 import urllib.parse
 import warnings
 import hashlib
@@ -1406,7 +1407,7 @@ def compose_multi_clip_reel(
         a_segs = []
 
         for i, c_path in enumerate(resolved_clips):
-            v_segs.append(f"[{i}:v]trim=0:{seg_dur},setpts=PTS-STARTPTS,{enh_step}{grade_step}scale={target_w}:{target_h}:flags=lanczos:force_original_aspect_ratio=increase,crop={target_w}:{target_h}[v{i}]")
+            v_segs.append(f"[{i}:v]trim=0:{seg_dur},setpts=PTS-STARTPTS,{enh_step}{grade_step}scale={target_w}:{target_h}:flags=bicubic:force_original_aspect_ratio=increase,crop={target_w}:{target_h}[v{i}]")
             if check_video_has_audio(c_path):
                 a_segs.append(f"[{i}:a]atrim=0:{seg_dur},asetpts=PTS-STARTPTS,aformat=sample_rates=48000:channel_layouts=stereo[a{i}]")
             else:
@@ -1415,7 +1416,7 @@ def compose_multi_clip_reel(
         cat_inputs = "".join(f"[v{i}][a{i}]" for i in range(num_clips))
         concat_part = f"{cat_inputs}concat=n={num_clips}:v=1:a=1[base_v][cat_a]"
         audio_norm_part = "[cat_a]loudnorm=I=-16:TP=-1.5:LRA=11[norm_a]"
-        overlay_part = f"[{ovl_input_idx}:v]scale={target_w}:{target_h}:flags=lanczos[ovl_s];[base_v][ovl_s]overlay=0:0[v]"
+        overlay_part = f"[{ovl_input_idx}:v]scale={target_w}:{target_h}:flags=bicubic[ovl_s];[base_v][ovl_s]overlay=0:0[v]"
 
         filter_complex = ";".join(v_segs + a_segs) + ";" + concat_part + ";" + audio_norm_part + ";" + overlay_part
 
@@ -1426,10 +1427,10 @@ def compose_multi_clip_reel(
         clip1_audio = check_video_has_audio(resolved_clips[1])
 
         v_filter = (
-            f"[0:v]trim=0:{duration},setpts=PTS-STARTPTS,{enh_step}{grade_step}scale={target_w}:{half_h}:flags=lanczos:force_original_aspect_ratio=increase,crop={target_w}:{half_h}[v_top];"
-            f"[1:v]trim=0:{duration},setpts=PTS-STARTPTS,{enh_step}{grade_step}scale={target_w}:{half_h}:flags=lanczos:force_original_aspect_ratio=increase,crop={target_w}:{half_h}[v_bot];"
+            f"[0:v]trim=0:{duration},setpts=PTS-STARTPTS,{enh_step}{grade_step}scale={target_w}:{half_h}:flags=bicubic:force_original_aspect_ratio=increase,crop={target_w}:{half_h}[v_top];"
+            f"[1:v]trim=0:{duration},setpts=PTS-STARTPTS,{enh_step}{grade_step}scale={target_w}:{half_h}:flags=bicubic:force_original_aspect_ratio=increase,crop={target_w}:{half_h}[v_bot];"
             f"[v_top][v_bot]vstack=inputs=2[base_v];"
-            f"[{ovl_input_idx}:v]scale={target_w}:{target_h}:flags=lanczos[ovl_s];"
+            f"[{ovl_input_idx}:v]scale={target_w}:{target_h}:flags=bicubic[ovl_s];"
             f"[base_v][ovl_s]overlay=0:0[v]"
         )
 
@@ -1455,10 +1456,10 @@ def compose_multi_clip_reel(
         clip1_audio = check_video_has_audio(resolved_clips[1])
 
         v_filter = (
-            f"[0:v]trim=0:{duration},setpts=PTS-STARTPTS,{enh_step}{grade_step}scale={target_w}:{target_h}:flags=lanczos:force_original_aspect_ratio=increase,crop={target_w}:{target_h}[v_main];"
-            f"[1:v]trim=0:{duration},setpts=PTS-STARTPTS,{enh_step}scale={pip_w}:{pip_h}:flags=lanczos:force_original_aspect_ratio=increase,crop={pip_w}:{pip_h}[v_pip];"
+            f"[0:v]trim=0:{duration},setpts=PTS-STARTPTS,{enh_step}{grade_step}scale={target_w}:{target_h}:flags=bicubic:force_original_aspect_ratio=increase,crop={target_w}:{target_h}[v_main];"
+            f"[1:v]trim=0:{duration},setpts=PTS-STARTPTS,{enh_step}scale={pip_w}:{pip_h}:flags=bicubic:force_original_aspect_ratio=increase,crop={pip_w}:{pip_h}[v_pip];"
             f"[v_main][v_pip]overlay={pip_x}:{pip_y}[base_v];"
-            f"[{ovl_input_idx}:v]scale={target_w}:{target_h}:flags=lanczos[ovl_s];"
+            f"[{ovl_input_idx}:v]scale={target_w}:{target_h}:flags=bicubic[ovl_s];"
             f"[base_v][ovl_s]overlay=0:0[v]"
         )
 
@@ -1479,15 +1480,15 @@ def compose_multi_clip_reel(
             vid_h = target_h - card_h
             v_filter = (
                 f"color=c=black:s={target_w}x{target_h}:r=30[bg];"
-                f"[0:v]trim=0:{duration},setpts=PTS-STARTPTS,{enh_step}{grade_step}scale={target_w}:{vid_h}:flags=lanczos:force_original_aspect_ratio=increase,crop={target_w}:{vid_h}[vid];"
+                f"[0:v]trim=0:{duration},setpts=PTS-STARTPTS,{enh_step}{grade_step}scale={target_w}:{vid_h}:flags=bicubic:force_original_aspect_ratio=increase,crop={target_w}:{vid_h}[vid];"
                 f"[bg][vid]overlay=0:{card_h}:shortest=1[base];"
-                f"[1:v]scale={target_w}:{target_h}:flags=lanczos[ovl];"
+                f"[1:v]scale={target_w}:{target_h}:flags=bicubic[ovl];"
                 f"[base][ovl]overlay=0:0[v]"
             )
         else:
             v_filter = (
-                f"[0:v]trim=0:{duration},setpts=PTS-STARTPTS,{enh_step}{grade_step}scale={target_w}:{target_h}:flags=lanczos:force_original_aspect_ratio=increase,crop={target_w}:{target_h}[vid];"
-                f"[1:v]scale={target_w}:{target_h}:flags=lanczos[ovl];"
+                f"[0:v]trim=0:{duration},setpts=PTS-STARTPTS,{enh_step}{grade_step}scale={target_w}:{target_h}:flags=bicubic:force_original_aspect_ratio=increase,crop={target_w}:{target_h}[vid];"
+                f"[1:v]scale={target_w}:{target_h}:flags=bicubic[ovl];"
                 f"[vid][ovl]overlay=0:0[v]"
             )
 
@@ -1498,9 +1499,24 @@ def compose_multi_clip_reel(
 
         filter_complex = f"{v_filter};{a_filter}"
 
-    crf_val = "16" if quality == "hd1080" else "19"
-    bitrate = "10M" if quality == "hd1080" else "5M"
-    preset = "medium" if quality == "hd1080" else "veryfast"
+    if quality == "fast_720":
+        crf_val = "23"
+        bitrate = "2800k"
+        maxrate = "3500k"
+        bufsize = "5000k"
+        preset = "veryfast"
+    elif quality == "hd1080":
+        crf_val = "22"
+        bitrate = "4200k"
+        maxrate = "5200k"
+        bufsize = "7500k"
+        preset = "veryfast"
+    else:
+        crf_val = "22"
+        bitrate = "3200k"
+        maxrate = "4000k"
+        bufsize = "6000k"
+        preset = "veryfast"
 
     cmd = [FFMPEG_PATH, "-y"]
     cmd.extend(cmd_inputs)
@@ -1513,11 +1529,11 @@ def compose_multi_clip_reel(
         "-preset", preset,
         "-crf", crf_val,
         "-b:v", bitrate,
-        "-maxrate", "14M",
-        "-bufsize", "18M",
+        "-maxrate", maxrate,
+        "-bufsize", bufsize,
         "-c:a", "aac",
-        "-b:a", "192k",
-        "-ar", "48000",
+        "-b:a", "128k",
+        "-ar", "44100",
         "-t", str(duration),
         "-movflags", "+faststart",
         out_path
@@ -1595,6 +1611,253 @@ def serve_video_file(file_path, handler):
 
 
 
+class BatchReelEngine:
+    def __init__(self):
+        self.lock = threading.Lock()
+        self.is_running = False
+        self.stop_requested = False
+        self.task_id = None
+        self.items = []
+        self.total = 0
+        self.current_index = 0
+        self.current_title = ""
+        self.current_pattern = ""
+        self.step = 0
+        self.step_text = "Idle"
+        self.results = []
+        self.start_time = 0
+        self.auto_post_ig = True
+        self.post_delay_sec = 10
+        self.quality = "fast_720"
+        self._thread = None
+
+    def start(self, items, auto_post_ig=True, post_delay_sec=10, quality="fast_720"):
+        if shutil.which("termux-wake-lock"):
+            try:
+                subprocess.run(["termux-wake-lock"], check=False)
+                print("[TERMUX] ✅ termux-wake-lock acquired for batch task!")
+            except Exception:
+                pass
+
+        with self.lock:
+            if self.is_running:
+                return {"success": False, "error": "A batch workflow is already running in background."}
+            self.is_running = True
+            self.stop_requested = False
+            self.items = items or []
+            self.total = len(self.items)
+            self.current_index = 0
+            self.current_title = ""
+            self.current_pattern = ""
+            self.step = 1
+            self.step_text = "Initializing background batch pipeline in Termux..."
+            self.results = []
+            self.start_time = time.time()
+            self.auto_post_ig = bool(auto_post_ig)
+            self.post_delay_sec = max(3, int(post_delay_sec))
+            self.quality = quality or "fast_720"
+            self.task_id = f"batch_{int(self.start_time)}"
+
+            self._thread = threading.Thread(target=self._worker_loop, daemon=True)
+            self._thread.start()
+            return {
+                "success": True,
+                "task_id": self.task_id,
+                "total": self.total,
+                "message": "Background batch task started. You can now lock phone or switch tabs safely."
+            }
+
+    def stop(self):
+        with self.lock:
+            if not self.is_running:
+                return {"success": True, "message": "No active batch task"}
+            self.stop_requested = True
+            self.step_text = "Stopping batch workflow gracefully..."
+            return {"success": True, "message": "Batch stop requested"}
+
+    def get_status(self):
+        with self.lock:
+            elapsed = int(time.time() - self.start_time) if self.start_time else 0
+            return {
+                "success": True,
+                "is_running": self.is_running,
+                "stop_requested": self.stop_requested,
+                "task_id": self.task_id,
+                "total": self.total,
+                "current_index": self.current_index,
+                "current_title": self.current_title,
+                "current_pattern": self.current_pattern,
+                "step": self.step,
+                "step_text": self.step_text,
+                "results": list(self.results),
+                "elapsed_seconds": elapsed,
+                "auto_post_ig": self.auto_post_ig
+            }
+
+    def _worker_loop(self):
+        print(f"[BATCH_ENGINE] Background thread running for {self.total} items.")
+        for idx, item in enumerate(self.items):
+            if self.stop_requested:
+                print(f"[BATCH_ENGINE] Stop requested before Story {idx + 1}. Breaking.")
+                break
+
+            title = item.get("title", f"Story #{idx + 1}").strip()
+            publisher = item.get("publisher", "").strip()
+            pattern = item.get("pattern", "reel_split")
+            manual_url = item.get("manualUrl", "").strip()
+            overlay_data = item.get("overlay", "")
+
+            with self.lock:
+                self.current_index = idx
+                self.current_title = title
+                self.current_pattern = pattern
+                self.step = 1
+                self.step_text = f"Story {idx + 1}/{self.total}: Extracting viral headline & hooks..."
+
+            result_entry = {
+                "index": idx,
+                "title": title,
+                "publisher": publisher,
+                "pattern": pattern,
+                "status": "working",
+                "step_text": "Processing...",
+                "video_url": "",
+                "rendered_filename": "",
+                "post_url": "",
+                "error": ""
+            }
+
+            try:
+                # 1. Hooks & Descriptions
+                top_hook = item.get("topHook", "")
+                caption = item.get("caption", "")
+                ig_caption = item.get("igCaption", "")
+                hashtags = item.get("hashtags", "#breakingnews #news #reels #viral #trending")
+                search_queries = item.get("searchQueries", [])
+
+                if not top_hook or not caption:
+                    try:
+                        hook_data = generate_reel_hooks(title, publisher, "top", "news")
+                        top_hook = hook_data.get("headline") or (title if title.upper().startswith("BREAKING") else f"BREAKING: {title}")
+                        caption = hook_data.get("description") or title
+                        ig_caption = hook_data.get("caption") or f"{top_hook}\n\n{caption}\n\nFollow for live global news updates."
+                        hashtags = hook_data.get("hashtags") or hashtags
+                        search_queries = hook_data.get("search_queries") or []
+                    except Exception as he:
+                        top_hook = title if title.upper().startswith("BREAKING") else f"BREAKING: {title}"
+                        caption = title
+                        ig_caption = f"{top_hook}\n\n{caption}"
+
+                if self.stop_requested: break
+
+                # 2. Fetch Background Video
+                with self.lock:
+                    self.step = 2
+                    self.step_text = f"Story {idx + 1}/{self.total}: Fetching background video from web..."
+
+                video_filename = "sample_reel.mp4"
+                if manual_url:
+                    try:
+                        fn, _, _ = fetch_video_from_query(manual_url)
+                        if fn: video_filename = fn
+                    except Exception as ve:
+                        print(f"[BATCH_ENGINE] Manual video fetch note: {ve}")
+                else:
+                    try:
+                        fn, _, _ = fetch_video_from_query(title, search_queries=search_queries)
+                        if fn: video_filename = fn
+                    except Exception as ve:
+                        print(f"[BATCH_ENGINE] Search video fetch note: {ve}")
+
+                if self.stop_requested: break
+
+                # 3. Render 9:16 Reel
+                with self.lock:
+                    self.step = 3
+                    self.step_text = f"Story {idx + 1}/{self.total}: Rendering 9:16 HD Reel ({self.quality})..."
+
+                composed_name, composed_path = compose_multi_clip_reel(
+                    vid_name=video_filename,
+                    overlay_data=overlay_data,
+                    layout=pattern,
+                    duration=12,
+                    quality=self.quality,
+                    quality_enhancement=False
+                )
+                result_entry["rendered_filename"] = composed_name
+                result_entry["video_url"] = f"/api/serve-video?name={composed_name}"
+
+                if self.stop_requested: break
+
+                # 4. Upload to Instagram
+                cl = get_instagram_client()
+                if self.auto_post_ig and cl:
+                    with self.lock:
+                        self.step = 4
+                        self.step_text = f"Story {idx + 1}/{self.total}: Uploading & Publishing to Instagram..."
+
+                    full_caption = f"{ig_caption}\n\n{hashtags}".strip() if hashtags else ig_caption
+
+                    # Fast thumbnail
+                    thumb_path = os.path.splitext(composed_path)[0] + "_thumb.jpg"
+                    if not os.path.exists(thumb_path):
+                        try:
+                            subprocess.run([
+                                FFMPEG_PATH, "-y",
+                                "-ss", "00:00:00.500",
+                                "-i", composed_path,
+                                "-vframes", "1",
+                                "-q:v", "3",
+                                thumb_path
+                            ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=8)
+                        except Exception: pass
+
+                    thumb_arg = Path(thumb_path) if os.path.exists(thumb_path) and os.path.getsize(thumb_path) > 0 else None
+                    media = cl.clip_upload(Path(composed_path), caption=full_caption, thumbnail=thumb_arg)
+                    reel_url = f"https://www.instagram.com/reel/{media.code}/"
+                    result_entry["post_url"] = reel_url
+                    result_entry["status"] = "done"
+                    result_entry["step_text"] = "Published on Instagram!"
+                    print(f"[BATCH_ENGINE] ✅ Story {idx + 1} posted: {reel_url}")
+                else:
+                    result_entry["status"] = "done"
+                    result_entry["step_text"] = "Rendered & Saved Locally"
+
+                with self.lock:
+                    self.results.append(result_entry)
+
+                # 5. Delay between posts
+                if self.auto_post_ig and cl and idx < self.total - 1 and not self.stop_requested:
+                    with self.lock:
+                        self.step = 5
+                    for sec in range(self.post_delay_sec, 0, -1):
+                        if self.stop_requested: break
+                        with self.lock:
+                            self.step_text = f"⏳ Waiting {sec}s before next post to respect Instagram limits..."
+                        time.sleep(1)
+
+            except Exception as item_err:
+                print(f"[BATCH_ENGINE] ❌ Story {idx + 1} error: {item_err}")
+                result_entry["status"] = "error"
+                result_entry["error"] = str(item_err)
+                result_entry["step_text"] = f"Failed: {str(item_err)[:40]}"
+                with self.lock:
+                    self.results.append(result_entry)
+
+        with self.lock:
+            self.is_running = False
+            self.step = 0
+            if self.stop_requested:
+                self.step_text = "Batch stopped by user."
+            else:
+                self.step_text = f"Completed all {len(self.results)} reels!"
+
+        print(f"[BATCH_ENGINE] Worker thread finished. Results count: {len(self.results)}")
+
+
+BATCH_ENGINE = BatchReelEngine()
+
+
 class NewsServerHandler(http.server.SimpleHTTPRequestHandler):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, directory=WEB_DIR, **kwargs)
@@ -1633,6 +1896,10 @@ class NewsServerHandler(http.server.SimpleHTTPRequestHandler):
 
         if path == "/api/status":
             return self.send_json({"status": "ok", "app": "PyGNews AI Memer & Reel Studio", "version": "2.0.0"})
+
+        # Background Batch Reel Engine status (for sleep mode / tab-switch resilience)
+        if path == "/api/batch-worker/status":
+            return self.send_json(BATCH_ENGINE.get_status())
 
         if path == "/api/topics":
             return self.send_json({"topics": constants.TOPICS})
@@ -1790,6 +2057,28 @@ class NewsServerHandler(http.server.SimpleHTTPRequestHandler):
         global ig_client
         parsed = urllib.parse.urlparse(self.path)
         path = parsed.path
+
+        # -------------------------------------------------------------
+        # Server-Side Background Batch Engine (Termux / Sleep Resilient)
+        # -------------------------------------------------------------
+        if path == "/api/batch-worker/start":
+            content_length = int(self.headers.get("Content-Length", 0))
+            post_body = self.rfile.read(content_length)
+            try:
+                payload = json.loads(post_body.decode("utf-8"))
+            except Exception:
+                payload = {}
+            items = payload.get("items", [])
+            auto_post = payload.get("auto_post_ig", True)
+            post_delay = payload.get("post_delay_sec", 10)
+            quality = payload.get("quality", "fast_720")
+            if not items:
+                return self.send_json({"error": "No articles provided for batch processing"}, status=400)
+            res = BATCH_ENGINE.start(items, auto_post_ig=auto_post, post_delay_sec=post_delay, quality=quality)
+            return self.send_json(res)
+
+        if path == "/api/batch-worker/stop":
+            return self.send_json(BATCH_ENGINE.stop())
 
         # Generate dark/deep meme angles with Groq AI
         if path == "/api/meme-suggest":
@@ -2185,24 +2474,32 @@ class NewsServerHandler(http.server.SimpleHTTPRequestHandler):
 
                 print(f"[INSTAGRAM] Source video for reel: {target_path} (size={os.path.getsize(target_path)} bytes)")
 
-                # Ensure 100% compliant Instagram H.264 MP4 with faststart
-                final_mp4_path = os.path.join(VIDEO_DIR, f"ig_ready_{int(time.time())}.mp4")
-                conv_cmd = [
-                    FFMPEG_PATH, "-y",
-                    "-i", target_path,
-                    "-c:v", "libx264",
-                    "-pix_fmt", "yuv420p",
-                    "-preset", "veryfast",
-                    "-crf", "22",
-                    "-c:a", "aac",
-                    "-b:a", "128k",
-                    "-movflags", "+faststart",
-                    final_mp4_path
-                ]
-                res = subprocess.run(conv_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=45)
-                if os.path.exists(final_mp4_path) and os.path.getsize(final_mp4_path) > 1000:
-                    target_path = final_mp4_path
-                    print(f"[INSTAGRAM] Transcoded to IG MP4: {final_mp4_path} ({os.path.getsize(final_mp4_path)} bytes)")
+                # Ensure 100% compliant Instagram H.264 MP4 with faststart (Skip redundant re-encode if already composed)
+                clean_target_name = os.path.basename(target_path)
+                if clean_target_name.startswith("composed_reel_") or clean_target_name.startswith("ig_ready_"):
+                    print(f"[INSTAGRAM] Target video is already composed ({clean_target_name}), skipping re-encode for ultra-fast upload!")
+                else:
+                    final_mp4_path = os.path.join(VIDEO_DIR, f"ig_ready_{int(time.time())}.mp4")
+                    conv_cmd = [
+                        FFMPEG_PATH, "-y",
+                        "-i", target_path,
+                        "-c:v", "libx264",
+                        "-pix_fmt", "yuv420p",
+                        "-preset", "veryfast",
+                        "-crf", "22",
+                        "-b:v", "3800k",
+                        "-maxrate", "4800k",
+                        "-bufsize", "6500k",
+                        "-c:a", "aac",
+                        "-b:a", "128k",
+                        "-ar", "44100",
+                        "-movflags", "+faststart",
+                        final_mp4_path
+                    ]
+                    res = subprocess.run(conv_cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=45)
+                    if os.path.exists(final_mp4_path) and os.path.getsize(final_mp4_path) > 1000:
+                        target_path = final_mp4_path
+                        print(f"[INSTAGRAM] Transcoded to IG MP4: {final_mp4_path} ({os.path.getsize(final_mp4_path)} bytes)")
 
                 full_caption = caption
                 if hashtags:
@@ -2259,6 +2556,14 @@ class NewsServerHandler(http.server.SimpleHTTPRequestHandler):
 
 
 def run_server(port=PORT):
+    # Auto-acquire Termux wake-lock on Android/Termux so phone sleep does not pause server
+    if shutil.which("termux-wake-lock"):
+        try:
+            subprocess.run(["termux-wake-lock"], check=False)
+            print("[TERMUX] ✅ termux-wake-lock acquired automatically. Server will stay awake when screen turns off!")
+        except Exception:
+            pass
+
     server_address = ("", port)
     try:
         ServerClass = getattr(http.server, "ThreadingHTTPServer", http.server.HTTPServer)
