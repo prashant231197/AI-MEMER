@@ -270,6 +270,38 @@ def get_video_info(file_path):
     return info
 
 
+def ensure_sample_reel_exists():
+    """Ensure sample_reel.mp4 exists in media/videos directory so fallback never fails."""
+    sample_path = os.path.join(VIDEO_DIR, "sample_reel.mp4")
+    if not os.path.exists(sample_path) or os.path.getsize(sample_path) < 1000:
+        try:
+            print("[SERVER] Creating resilient sample_reel.mp4 background video...")
+            cmd = [
+                FFMPEG_PATH, "-y",
+                "-f", "lavfi", "-i", "color=c=#0f172a:s=720x1280:d=10:r=30",
+                "-f", "lavfi", "-i", "anullsrc=channel_layout=stereo:sample_rate=44100",
+                "-c:v", "libx264", "-pix_fmt", "yuv420p", "-preset", "veryfast",
+                "-c:a", "aac", "-b:a", "128k",
+                "-t", "10", "-movflags", "+faststart",
+                sample_path
+            ]
+            subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=20)
+        except Exception as e:
+            print(f"[SERVER] Note on sample_reel creation: {e}")
+    return sample_path
+
+
+def safe_clean_search_text(text):
+    """
+    Safely strip punctuation and symbols without mangling Hindi matras or Unicode characters.
+    """
+    if not text:
+        return ""
+    import unicodedata
+    cleaned = "".join(c if not unicodedata.category(c).startswith("P") and c not in '|\"\'`~' else " " for c in text)
+    return " ".join(cleaned.split()).strip()
+
+
 def ensure_h264_mp4(src_path):
     """
     Ensure the downloaded file is standard H.264 MP4 with faststart flags.
@@ -297,13 +329,17 @@ def ensure_h264_mp4(src_path):
             "-c:v", "libx264",
             "-pix_fmt", "yuv420p",
             "-preset", "veryfast",
-            "-crf", "18",
-            "-movflags", "+faststart"
+            "-crf", "18"
         ]
         if has_audio:
-            convert_cmd.extend(["-c:a", "aac", "-b:a", "192k"])
+            convert_cmd.extend(["-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart"])
         else:
-            convert_cmd.extend(["-f", "lavfi", "-i", "anullsrc=channel_layout=stereo:sample_rate=44100", "-c:a", "aac", "-b:a", "128k"])
+            convert_cmd.extend([
+                "-f", "lavfi", "-i", "anullsrc=channel_layout=stereo:sample_rate=44100",
+                "-c:a", "aac", "-b:a", "128k",
+                "-shortest",
+                "-movflags", "+faststart"
+            ])
         
         convert_cmd.append(out_mp4)
         sub_res = subprocess.run(convert_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=60)
@@ -318,23 +354,24 @@ def extract_news_search_queries(headline, related_coverage=None):
     """
     Extract substantive keywords to form multiple prioritized search queries
     specifically for finding relevant news b-roll and broadcast footage.
+    Unicode/Hindi safe.
     """
-    clean_h = re.sub(r"[^\w\s]", " ", headline)
+    clean_h = safe_clean_search_text(headline)
     stop_words = {
         "the", "and", "for", "with", "from", "that", "this", "after", "into", "over",
         "says", "said", "will", "what", "when", "where", "how", "today", "news", "amid",
         "first", "about", "could", "have", "been", "their", "more", "also", "some", "cost",
         "costs", "just", "like", "they", "than", "were", "here", "there", "breaking"
     }
-    words = [w for w in clean_h.split() if len(w) > 2 and w.lower() not in stop_words]
-    core_kw = " ".join(words[:4]) if words else headline[:30]
+    words = [w for w in clean_h.split() if len(w) > 1 and w.lower() not in stop_words]
+    core_kw = " ".join(words[:4]) if words else clean_h[:40]
 
     related_kws = []
     if related_coverage and isinstance(related_coverage, list):
         for item in related_coverage[:3]:
             r_title = item.get("title", "") if isinstance(item, dict) else str(item)
-            r_clean = re.sub(r"[^\w\s]", " ", r_title)
-            r_words = [w for w in r_clean.split() if len(w) > 2 and w.lower() not in stop_words]
+            r_clean = safe_clean_search_text(r_title)
+            r_words = [w for w in r_clean.split() if len(w) > 1 and w.lower() not in stop_words]
             if r_words:
                 related_kws.append(" ".join(r_words[:4]))
 
@@ -404,25 +441,33 @@ def fetch_or_search_video(source_input, is_search=False, related_queries=None):
             "concurrent_fragment_downloads": 4,
             "max_filesize": 50 * 1024 * 1024,
         }
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(target_query, download=True)
-            if "entries" in info and info["entries"]:
-                info = info["entries"][0]
-            
-            final_filename = f"reel_{file_id}.mp4"
-            actual_path = os.path.join(VIDEO_DIR, final_filename)
-            if not os.path.exists(actual_path):
-                candidates = [f for f in os.listdir(VIDEO_DIR) if f.startswith(f"reel_{file_id}") and not f.endswith(".part")]
-                if candidates:
-                    candidates.sort(key=lambda x: (x.endswith(".mp4"), os.path.getsize(os.path.join(VIDEO_DIR, x))), reverse=True)
-                    actual_path = os.path.join(VIDEO_DIR, candidates[0])
+        try:
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                info = ydl.extract_info(target_query, download=True)
+                if "entries" in info and info["entries"]:
+                    info = info["entries"][0]
+                
+                final_filename = f"reel_{file_id}.mp4"
+                actual_path = os.path.join(VIDEO_DIR, final_filename)
+                if not os.path.exists(actual_path):
+                    candidates = [f for f in os.listdir(VIDEO_DIR) if f.startswith(f"reel_{file_id}") and not f.endswith(".part")]
+                    if candidates:
+                        candidates.sort(key=lambda x: (x.endswith(".mp4"), os.path.getsize(os.path.join(VIDEO_DIR, x))), reverse=True)
+                        actual_path = os.path.join(VIDEO_DIR, candidates[0])
 
-            ensured_path = ensure_h264_mp4(actual_path)
-            final_filename = os.path.basename(ensured_path)
-            v_info = get_video_info(ensured_path)
-            title = info.get("title", "HD Video Clip")
-            VIDEO_CACHE[cache_key] = {"filename": final_filename, "title": title}
-            return final_filename, title, v_info
+                ensured_path = ensure_h264_mp4(actual_path)
+                final_filename = os.path.basename(ensured_path)
+                v_info = get_video_info(ensured_path)
+                title = info.get("title", "HD Video Clip")
+                VIDEO_CACHE[cache_key] = {"filename": final_filename, "title": title}
+                return final_filename, title, v_info
+        except Exception as ydl_e:
+            print(f"[VIDEO_FETCH] Direct URL download note ({source_clean[:40]}): {ydl_e}")
+            sample_path = ensure_sample_reel_exists()
+            if os.path.exists(sample_path) and os.path.getsize(sample_path) > 1000:
+                v_info = get_video_info(sample_path)
+                return "sample_reel.mp4", "News Background Motion Clip", v_info
+            raise
 
     # Search Mode with Multi-Query & Candidate Retry Loop
     queries_to_try = []
@@ -447,7 +492,7 @@ def fetch_or_search_video(source_input, is_search=False, related_queries=None):
 
     for q_idx, q in enumerate(queries_to_try):
         print(f"[VIDEO_SEARCH] Attempt {q_idx + 1}/{len(queries_to_try)}: '{q}'")
-        clean_q = re.sub(r"[^\w\s-]", " ", q).strip()
+        clean_q = safe_clean_search_text(q)
         search_target = f"ytsearch6:{clean_q}"
 
         ydl_search_opts = {
@@ -526,7 +571,7 @@ def fetch_or_search_video(source_input, is_search=False, related_queries=None):
                 continue
 
     # Clean Fallback (if all internet searches failed, use sample_reel.mp4, NEVER a random roller coaster)
-    sample_path = os.path.join(VIDEO_DIR, "sample_reel.mp4")
+    sample_path = ensure_sample_reel_exists()
     if os.path.exists(sample_path) and os.path.getsize(sample_path) > 1000:
         v_info = get_video_info(sample_path)
         return "sample_reel.mp4", "News Background Motion Clip", v_info
@@ -1352,21 +1397,37 @@ def compose_multi_clip_reel(
     if not resolved_clips:
         single_path = os.path.join(VIDEO_DIR, os.path.basename(vid_name)) if vid_name else ""
         if not single_path or not os.path.exists(single_path) or os.path.getsize(single_path) < 1000:
-            single_path = os.path.join(VIDEO_DIR, "sample_reel.mp4")
+            sample_path = ensure_sample_reel_exists()
+            single_path = sample_path if os.path.exists(sample_path) else os.path.join(VIDEO_DIR, "sample_reel.mp4")
         resolved_clips = [single_path]
 
-    timestamp = int(time.time())
-    overlay_path = os.path.join(VIDEO_DIR, f"temp_overlay_{timestamp}.png")
+    timestamp = int(time.time() * 1000)
+    overlay_path = os.path.join(VIDEO_DIR, f"temp_overlay_{timestamp}_{random.randint(100, 999)}.png")
+    target_w, target_h = (1080, 1920) if quality == "hd1080" else (720, 1280)
 
-    if "," in overlay_data:
-        overlay_data = overlay_data.split(",", 1)[1]
-    with open(overlay_path, "wb") as f:
-        f.write(base64.b64decode(overlay_data))
+    # Safely decode overlay base64 or create transparent image
+    overlay_written = False
+    if overlay_data and isinstance(overlay_data, str) and len(overlay_data.strip()) > 50:
+        try:
+            raw_b64 = overlay_data.split(",", 1)[1] if "," in overlay_data else overlay_data
+            img_bytes = base64.b64decode(raw_b64)
+            if len(img_bytes) > 100:
+                with open(overlay_path, "wb") as f:
+                    f.write(img_bytes)
+                overlay_written = True
+        except Exception as oe:
+            print(f"[COMPOSE] Overlay decode note: {oe}")
+            overlay_written = False
+
+    if not overlay_written or not os.path.exists(overlay_path) or os.path.getsize(overlay_path) < 100:
+        try:
+            img = Image.new("RGBA", (target_w, target_h), (0, 0, 0, 0))
+            img.save(overlay_path, "PNG")
+        except Exception as pe:
+            print(f"[COMPOSE] Fallback transparent PNG note: {pe}")
 
     out_name = f"composed_reel_{timestamp}.mp4"
     out_path = os.path.join(VIDEO_DIR, out_name)
-
-    target_w, target_h = (1080, 1920) if quality == "hd1080" else (720, 1280)
 
     # Color Grade Chains
     cg_filter_map = {
@@ -1705,7 +1766,7 @@ class BatchReelEngine:
             publisher = item.get("publisher", "").strip()
             pattern = item.get("pattern", "reel_split")
             manual_url = item.get("manualUrl", "").strip()
-            overlay_data = item.get("overlay", "")
+            overlay_data = item.get("overlay", "") or item.get("overlayData", "")
 
             with self.lock:
                 self.current_index = idx
@@ -1758,16 +1819,26 @@ class BatchReelEngine:
                 video_filename = "sample_reel.mp4"
                 if manual_url:
                     try:
-                        fn, _, _ = fetch_video_from_query(manual_url)
+                        fn, _, _ = fetch_or_search_video(manual_url, is_search=False)
                         if fn: video_filename = fn
                     except Exception as ve:
-                        print(f"[BATCH_ENGINE] Manual video fetch note: {ve}")
+                        print(f"[BATCH_ENGINE] Manual video fetch failed ({ve}), searching by title...")
+                        try:
+                            fn, _, _ = fetch_or_search_video(title, is_search=True, related_queries=search_queries)
+                            if fn: video_filename = fn
+                        except Exception as se:
+                            print(f"[BATCH_ENGINE] Search fallback note: {se}")
                 else:
                     try:
-                        fn, _, _ = fetch_video_from_query(title, search_queries=search_queries)
+                        fn, _, _ = fetch_or_search_video(title, is_search=True, related_queries=search_queries)
                         if fn: video_filename = fn
                     except Exception as ve:
                         print(f"[BATCH_ENGINE] Search video fetch note: {ve}")
+
+                # Ensure source video exists
+                if not os.path.exists(os.path.join(VIDEO_DIR, video_filename)):
+                    ensure_sample_reel_exists()
+                    video_filename = "sample_reel.mp4"
 
                 if self.stop_requested: break
 
@@ -2563,6 +2634,9 @@ def run_server(port=PORT):
             print("[TERMUX] ✅ termux-wake-lock acquired automatically. Server will stay awake when screen turns off!")
         except Exception:
             pass
+
+    # Ensure baseline sample_reel.mp4 is available
+    ensure_sample_reel_exists()
 
     server_address = ("", port)
     try:

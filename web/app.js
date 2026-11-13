@@ -5486,6 +5486,7 @@ async function startBatchWorkflow() {
       pattern: pattern,
       manualUrl: art.manualVideoUrl || (isManualSource ? globalManualUrl : ''),
       overlay: overlayPng,
+      overlayData: overlayPng,
       topHook: topHook,
       caption: description,
       igCaption: `${topHook}\n\n${description}\n\nStay tuned for real-time global news updates.\n\n#breakingnews #news #reels`,
