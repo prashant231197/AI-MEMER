@@ -1544,16 +1544,42 @@ def compose_multi_clip_reel(
         filter_complex = f"{v_filter};{a_filter}"
 
     else:
-        # Single Video / Highlights / Split News Layout
+        # Single Video / Highlights / Satire / Split News Layouts
         has_audio = check_video_has_audio(resolved_clips[0])
-        if layout == "reel_broadcast_highlights":
-            # High-end Broadcast 16:9 center window
-            v_x = int(28 * (target_w / 720))
-            v_y = int(270 * (target_h / 1280))
-            v_w = int(664 * (target_w / 720))
-            v_h = int(390 * (target_h / 1280))
+        if layout in ("reel_broadcast_highlights", "reel_tom_doge_newspaper", "reel_anchor_cat_buzz", "reel_satire_anchor_desk", "reel_global_diplomacy"):
+            if layout == "reel_broadcast_highlights":
+                v_x = int(28 * (target_w / 720))
+                v_y = int(270 * (target_h / 1280))
+                v_w = int(664 * (target_w / 720))
+                v_h = int(390 * (target_h / 1280))
+                bg_color = "#070b14"
+            elif layout == "reel_tom_doge_newspaper":
+                v_x = int(32 * (target_w / 720))
+                v_y = int(380 * (target_h / 1280))
+                v_w = int(656 * (target_w / 720))
+                v_h = int(370 * (target_h / 1280))
+                bg_color = "#121316"
+            elif layout == "reel_anchor_cat_buzz":
+                v_x = int(32 * (target_w / 720))
+                v_y = int(430 * (target_h / 1280))
+                v_w = int(656 * (target_w / 720))
+                v_h = int(370 * (target_h / 1280))
+                bg_color = "#0b1528"
+            elif layout == "reel_satire_anchor_desk":
+                v_x = int(32 * (target_w / 720))
+                v_y = int(140 * (target_h / 1280))
+                v_w = int(656 * (target_w / 720))
+                v_h = int(410 * (target_h / 1280))
+                bg_color = "#1a1a24"
+            else: # reel_global_diplomacy
+                v_x = int(32 * (target_w / 720))
+                v_y = int(250 * (target_h / 1280))
+                v_w = int(656 * (target_w / 720))
+                v_h = int(380 * (target_h / 1280))
+                bg_color = "#080c18"
+
             v_filter = (
-                f"color=c=#070b14:s={target_w}x{target_h}:r=30[bg];"
+                f"color=c={bg_color}:s={target_w}x{target_h}:r=30[bg];"
                 f"[0:v]trim=0:{duration},setpts=PTS-STARTPTS,{enh_step}{grade_step}scale={v_w}:{v_h}:flags=bicubic:force_original_aspect_ratio=increase,crop={v_w}:{v_h}[vid];"
                 f"[bg][vid]overlay={v_x}:{v_y}[base];"
                 f"[1:v]scale={target_w}:{target_h}:flags=bicubic[ovl];"
@@ -1641,7 +1667,7 @@ def compose_multi_clip_reel(
 
 
 # Backward compatible alias for existing single video callers (Instagram publish, etc.)
-def compose_reel_video(vid_name, overlay_data, layout="reel_split", duration=12, quality="hd1080", color_grade="none", clips=None, collab_mode="single", quality_enhancement=True):
+def compose_reel_video(vid_name, overlay_data, layout="reel_broadcast_highlights", duration=20, quality="hd1080", color_grade="none", clips=None, collab_mode="single", quality_enhancement=True):
     return compose_multi_clip_reel(
         clips=clips,
         vid_name=vid_name,

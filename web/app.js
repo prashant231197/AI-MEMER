@@ -2367,8 +2367,8 @@ async function autoCreateCollabEdit() {
         collab_mode: reelState.collabMode || 'sequence',
         quality_enhancement: reelState.qualityEnhance !== false,
         overlay: overlay,
-        layout: reelState.layout || 'reel_broadcast_highlights',
-        duration: reelState.duration || 20,
+        layout: reelState.layout || 'reel_split',
+        duration: reelState.duration || 12,
         quality: reelState.quality || 'hd1080',
         color_grade: reelState.colorGrade || 'none'
       })
@@ -3849,6 +3849,1167 @@ function drawReelBroadcastHighlightsLayout(targetCtx, w, h, vid, hasVideo, topHo
   ctx.fillText(tagsText, w - 28 * s, footY + 36 * s);
 }
 
+
+/* ==========================================================================
+   FEATURED #2 TOP TEMPLATE: Tom & Doge Vintage Newspaper (Meme Desk)
+   Inspired by: media_1794842199706_7e19dcf0.jpg (Left Half)
+   ========================================================================== */
+function drawReelTomDogeNewspaperLayout(ctx, w, h, vid, hasVideo, topHook, caption, publisher, overlayOnly = false, customData = null) {
+  const s = w / 720;
+  const titleText = customData?.topHook || topHook || state.selectedArticle?.title || 'BREAKING: Global Summit Sparks Worldwide Buzz';
+  const descText = customData?.caption || caption || state.selectedArticle?.description || 'World leaders gather to discuss international breakthroughs.';
+  const pubText = customData?.publisher || publisher || state.selectedArticle?.publisher || 'TODAY MEMER';
+
+  const highlights = extractDynamicHighlights(titleText, descText, pubText);
+
+  if (!overlayOnly) {
+    const bgGrad = ctx.createLinearGradient(0, 0, 0, h);
+    bgGrad.addColorStop(0, '#111317');
+    bgGrad.addColorStop(0.3, '#1c1f26');
+    bgGrad.addColorStop(0.7, '#15171c');
+    bgGrad.addColorStop(1, '#0c0d10');
+    ctx.fillStyle = bgGrad;
+    ctx.fillRect(0, 0, w, h);
+
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.03)';
+    for (let gy = 10 * s; gy < h; gy += 18 * s) {
+      ctx.fillRect(15 * s, gy, w - 30 * s, 2 * s);
+    }
+  }
+
+  // 2. Top Header: Tom Cat with Sunglasses (Left) + Speech Bubble + Live Pill (Right)
+  const topY = 24 * s;
+  const tomX = 48 * s;
+  const tomY = topY + 40 * s;
+  const tomR = 34 * s;
+
+  ctx.fillStyle = '#64748b';
+  ctx.beginPath();
+  ctx.arc(tomX, tomY, tomR, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = '#cbd5e1';
+  ctx.beginPath();
+  ctx.moveTo(tomX - 28 * s, tomY - 20 * s);
+  ctx.lineTo(tomX - 38 * s, tomY - 50 * s);
+  ctx.lineTo(tomX - 10 * s, tomY - 30 * s);
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.beginPath();
+  ctx.moveTo(tomX + 28 * s, tomY - 20 * s);
+  ctx.lineTo(tomX + 38 * s, tomY - 50 * s);
+  ctx.lineTo(tomX + 10 * s, tomY - 30 * s);
+  ctx.closePath();
+  ctx.fill();
+
+  // Tom Sunglasses
+  ctx.fillStyle = '#0f172a';
+  ctx.fillRect(tomX - 28 * s, tomY - 10 * s, 26 * s, 18 * s);
+  ctx.fillRect(tomX + 2 * s, tomY - 10 * s, 26 * s, 18 * s);
+  ctx.fillRect(tomX - 3 * s, tomY - 6 * s, 6 * s, 4 * s);
+
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(tomX - 24 * s, tomY - 7 * s, 6 * s, 6 * s);
+  ctx.fillRect(tomX + 6 * s, tomY - 7 * s, 6 * s, 6 * s);
+
+  // Muzzle & nose
+  ctx.fillStyle = '#f8fafc';
+  ctx.beginPath();
+  ctx.arc(tomX, tomY + 14 * s, 14 * s, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = '#f43f5e';
+  ctx.beginPath();
+  ctx.arc(tomX, tomY + 9 * s, 4 * s, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Thought Bubble
+  const bX = tomX + 46 * s;
+  const bY = topY + 10 * s;
+  const bW = 270 * s;
+  const bH = 58 * s;
+
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.95)';
+  roundRect(ctx, bX, bY, bW, bH, 14 * s);
+  ctx.fill();
+
+  ctx.beginPath();
+  ctx.moveTo(bX, bY + 28 * s);
+  ctx.lineTo(bX - 12 * s, bY + 34 * s);
+  ctx.lineTo(bX, bY + 40 * s);
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.fillStyle = '#0f172a';
+  ctx.font = `bold ${Math.round(15 * s)}px "Plus Jakarta Sans", sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.fillText('Kya chal raha hai', bX + bW / 2, bY + 24 * s);
+  ctx.fillText('duniya mein? 👀', bX + bW / 2, bY + 46 * s);
+
+  // Right: 🔴 LIVE Badge
+  const liveX = w - 130 * s;
+  const liveY = topY + 18 * s;
+  ctx.fillStyle = '#dc2626';
+  roundRect(ctx, liveX, liveY, 102 * s, 36 * s, 18 * s);
+  ctx.fill();
+  ctx.strokeStyle = '#fca5a5';
+  ctx.lineWidth = 1.5 * s;
+  ctx.stroke();
+
+  ctx.fillStyle = '#ffffff';
+  ctx.beginPath();
+  ctx.arc(liveX + 20 * s, liveY + 18 * s, 5 * s, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = '#ffffff';
+  ctx.font = `900 ${Math.round(15 * s)}px "Outfit", sans-serif`;
+  ctx.textAlign = 'left';
+  ctx.fillText('LIVE', liveX + 34 * s, liveY + 24 * s);
+
+  // 3. 3D Slanted Red BREAKING NEWS Ribbon
+  const ribY = 108 * s;
+  ctx.save();
+  ctx.beginPath();
+  ctx.moveTo(20 * s, ribY);
+  ctx.lineTo(340 * s, ribY);
+  ctx.lineTo(315 * s, ribY + 46 * s);
+  ctx.lineTo(20 * s, ribY + 46 * s);
+  ctx.closePath();
+  ctx.fillStyle = '#dc2626';
+  ctx.shadowColor = 'rgba(220, 38, 38, 0.6)';
+  ctx.shadowBlur = 14 * s;
+  ctx.fill();
+  ctx.restore();
+
+  ctx.fillStyle = '#ffffff';
+  ctx.font = `900 ${Math.round(27 * s)}px Impact, "Outfit", sans-serif`;
+  ctx.textAlign = 'left';
+  ctx.fillText('BREAKING', 38 * s, ribY + 34 * s);
+
+  ctx.fillStyle = '#0f172a';
+  roundRect(ctx, 196 * s, ribY + 5 * s, 98 * s, 36 * s, 6 * s);
+  ctx.fill();
+  ctx.fillStyle = '#facc15';
+  ctx.font = `900 ${Math.round(23 * s)}px Impact, "Outfit", sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.fillText('NEWS', 245 * s, ribY + 31 * s);
+
+  // 4. Yellow Vintage Newspaper Parchment Card
+  const papY = 166 * s;
+  const papH = 186 * s;
+  const papW = w - 48 * s;
+  const papX = 24 * s;
+
+  const papGrad = ctx.createLinearGradient(papX, papY, papX, papY + papH);
+  papGrad.addColorStop(0, '#fef08a');
+  papGrad.addColorStop(0.5, '#fde047');
+  papGrad.addColorStop(1, '#eab308');
+  ctx.fillStyle = papGrad;
+  roundRect(ctx, papX, papY, papW, papH, 12 * s);
+  ctx.fill();
+
+  ctx.strokeStyle = '#ca8a04';
+  ctx.lineWidth = 2 * s;
+  ctx.setLineDash([6 * s, 4 * s]);
+  roundRect(ctx, papX + 5 * s, papY + 5 * s, papW - 10 * s, papH - 10 * s, 8 * s);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  const cleanHead = titleText.replace(/^BREAKING:\s*/i, '').trim();
+  ctx.fillStyle = '#0f172a';
+  ctx.font = `900 ${Math.round(24 * s)}px "Outfit", serif`;
+  ctx.textAlign = 'left';
+  wrapText(ctx, `${cleanHead} 💀`, papX + 18 * s, papY + 42 * s, papW - 36 * s, 33 * s, 4);
+
+  // 5. Center Framed Video Viewport
+  const vX = 32 * s;
+  const vY = 380 * s;
+  const vW = w - 64 * s;
+  const vH = 370 * s;
+
+  if (overlayOnly) {
+    ctx.clearRect(vX, vY, vW, vH);
+  } else {
+    if (hasVideo && vid) {
+      try {
+        ctx.drawImage(vid, vX, vY, vW, vH);
+      } catch (err) {}
+    } else {
+      ctx.fillStyle = '#090a0f';
+      ctx.fillRect(vX, vY, vW, vH);
+    }
+  }
+
+  // Border around Video
+  ctx.strokeStyle = '#ffffff';
+  ctx.lineWidth = 3.5 * s;
+  roundRect(ctx, vX, vY, vW, vH, 8 * s);
+  ctx.stroke();
+
+  // Crown 👑
+  ctx.font = `${Math.round(34 * s)}px sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.fillText('👑', vX + vW - 30 * s, vY + 24 * s);
+
+  // Watch Now
+  ctx.fillStyle = '#ffffff';
+  ctx.font = `italic 900 ${Math.round(22 * s)}px "Outfit", cursive, sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.fillText('Watch Now!', vX + vW / 2, vY + vH - 24 * s);
+
+  ctx.strokeStyle = '#facc15';
+  ctx.lineWidth = 3 * s;
+  ctx.beginPath();
+  ctx.moveTo(vX + vW / 2 - 55 * s, vY + vH - 16 * s);
+  ctx.lineTo(vX + vW / 2 + 55 * s, vY + vH - 16 * s);
+  ctx.stroke();
+
+  // 6. Highlights Box (Left) & Doge (Right)
+  const hlY = 780 * s;
+  const hlH = 390 * s;
+  const hlW = 390 * s;
+  const hlX = 24 * s;
+
+  ctx.fillStyle = '#111827';
+  roundRect(ctx, hlX, hlY, hlW, hlH, 14 * s);
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(239, 68, 68, 0.4)';
+  ctx.lineWidth = 2 * s;
+  ctx.stroke();
+
+  ctx.fillStyle = '#dc2626';
+  roundRect(ctx, hlX + 12 * s, hlY + 12 * s, 180 * s, 36 * s, 8 * s);
+  ctx.fill();
+  ctx.fillStyle = '#ffffff';
+  ctx.font = `900 ${Math.round(18 * s)}px "Outfit", sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.fillText('Key Highlights:', hlX + 102 * s, hlY + 37 * s);
+
+  const bStartY = hlY + 84 * s;
+  const bSpacing = 94 * s;
+  highlights.slice(0, 3).forEach((bullet, idx) => {
+    const curY = bStartY + idx * bSpacing;
+
+    ctx.fillStyle = '#facc15';
+    ctx.font = `900 ${Math.round(24 * s)}px "Outfit", sans-serif`;
+    ctx.textAlign = 'left';
+    ctx.fillText('✔', hlX + 16 * s, curY + 10 * s);
+
+    ctx.fillStyle = '#ffffff';
+    ctx.font = `bold ${Math.round(16 * s)}px "Plus Jakarta Sans", sans-serif`;
+    wrapText(ctx, bullet, hlX + 48 * s, curY, hlW - 60 * s, 23 * s, 3);
+  });
+
+  // Doge Box
+  const dogeCardX = hlX + hlW + 14 * s;
+  const dogeCardW = w - dogeCardX - 24 * s;
+  const dogeCardH = hlH;
+
+  ctx.fillStyle = '#111827';
+  roundRect(ctx, dogeCardX, hlY, dogeCardW, dogeCardH, 14 * s);
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(250, 204, 21, 0.4)';
+  ctx.lineWidth = 2 * s;
+  ctx.stroke();
+
+  // Doge Thought Bubble
+  const dbX = dogeCardX + 12 * s;
+  const dbY = hlY + 16 * s;
+  const dbW = dogeCardW - 24 * s;
+  const dbH = 68 * s;
+
+  ctx.fillStyle = '#ffffff';
+  roundRect(ctx, dbX, dbY, dbW, dbH, 14 * s);
+  ctx.fill();
+
+  ctx.fillStyle = '#0f172a';
+  ctx.font = `bold ${Math.round(14 * s)}px "Plus Jakarta Sans", sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.fillText('World Peace?', dbX + dbW / 2, dbY + 28 * s);
+  ctx.fillText('Hmm... 🤤', dbX + dbW / 2, dbY + 52 * s);
+
+  // Doge Head
+  const dogeCenterX = dogeCardX + dogeCardW / 2;
+  const dogeCenterY = hlY + 220 * s;
+  const dogeR = 52 * s;
+
+  const dGrad = ctx.createRadialGradient(dogeCenterX, dogeCenterY, 5 * s, dogeCenterX, dogeCenterY, dogeR);
+  dGrad.addColorStop(0, '#fef08a');
+  dGrad.addColorStop(0.65, '#facc15');
+  dGrad.addColorStop(1, '#ca8a04');
+  ctx.fillStyle = dGrad;
+  ctx.beginPath();
+  ctx.arc(dogeCenterX, dogeCenterY, dogeR, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = '#b45309';
+  ctx.beginPath();
+  ctx.moveTo(dogeCenterX - 38 * s, dogeCenterY - 32 * s);
+  ctx.lineTo(dogeCenterX - 56 * s, dogeCenterY - 70 * s);
+  ctx.lineTo(dogeCenterX - 18 * s, dogeCenterY - 44 * s);
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.beginPath();
+  ctx.moveTo(dogeCenterX + 38 * s, dogeCenterY - 32 * s);
+  ctx.lineTo(dogeCenterX + 56 * s, dogeCenterY - 70 * s);
+  ctx.lineTo(dogeCenterX + 18 * s, dogeCenterY - 44 * s);
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.fillStyle = '#0f172a';
+  ctx.fillRect(dogeCenterX - 48 * s, dogeCenterY - 16 * s, 44 * s, 26 * s);
+  ctx.fillRect(dogeCenterX + 4 * s, dogeCenterY - 16 * s, 44 * s, 26 * s);
+  ctx.fillRect(dogeCenterX - 6 * s, dogeCenterY - 10 * s, 12 * s, 8 * s);
+
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(dogeCenterX - 40 * s, dogeCenterY - 10 * s, 10 * s, 10 * s);
+  ctx.fillRect(dogeCenterX + 12 * s, dogeCenterY - 10 * s, 10 * s, 10 * s);
+
+  ctx.fillStyle = '#fef08a';
+  ctx.beginPath();
+  ctx.arc(dogeCenterX, dogeCenterY + 22 * s, 22 * s, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = '#0f172a';
+  ctx.beginPath();
+  ctx.arc(dogeCenterX, dogeCenterY + 14 * s, 8 * s, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = '#f43f5e';
+  ctx.beginPath();
+  ctx.arc(dogeCenterX, dogeCenterY + 34 * s, 8 * s, 0, Math.PI);
+  ctx.fill();
+
+  // 7. Footer
+  const footY = h - 68 * s;
+  ctx.fillStyle = '#090a0f';
+  ctx.fillRect(0, footY, w, 68 * s);
+  ctx.fillStyle = '#facc15';
+  ctx.fillRect(0, footY, w, 2.5 * s);
+
+  ctx.font = `${Math.round(36 * s)}px sans-serif`;
+  ctx.textAlign = 'left';
+  ctx.fillText('😹', 24 * s, footY + 48 * s);
+
+  ctx.fillStyle = '#ffffff';
+  ctx.font = `italic 900 ${Math.round(22 * s)}px "Outfit", sans-serif`;
+  ctx.fillText('Meanwhile on ', 75 * s, footY + 44 * s);
+
+  ctx.fillStyle = '#facc15';
+  ctx.font = `italic 900 ${Math.round(23 * s)}px "Outfit", cursive, sans-serif`;
+  ctx.fillText('Internet...', 222 * s, footY + 44 * s);
+}
+
+
+/* ==========================================================================
+   FEATURED #3 TOP TEMPLATE: News bhi... Meme bhi... (Shocked Cat Anchor & Buzz)
+   Inspired by: media_1794842199706_7e19dcf0.jpg (Right Half)
+   ========================================================================== */
+function drawReelAnchorCatBuzzLayout(ctx, w, h, vid, hasVideo, topHook, caption, publisher, overlayOnly = false, customData = null) {
+  const s = w / 720;
+  const titleText = customData?.topHook || topHook || state.selectedArticle?.title || 'BREAKING: Historic Global Accord Signed';
+  const descText = customData?.caption || caption || state.selectedArticle?.description || 'Diplomats announce breakthrough in high-stakes talks.';
+  const pubText = customData?.publisher || publisher || state.selectedArticle?.publisher || 'TODAY MEMER';
+
+  const highlights = extractDynamicHighlights(titleText, descText, pubText);
+
+  if (!overlayOnly) {
+    const bgGrad = ctx.createLinearGradient(0, 0, 0, h);
+    bgGrad.addColorStop(0, '#0a1931');
+    bgGrad.addColorStop(0.35, '#152b52');
+    bgGrad.addColorStop(0.7, '#0d1d3a');
+    bgGrad.addColorStop(1, '#050c18');
+    ctx.fillStyle = bgGrad;
+    ctx.fillRect(0, 0, w, h);
+
+    ctx.fillStyle = 'rgba(59, 130, 246, 0.08)';
+    for (let gx = 40 * s; gx < w; gx += 32 * s) {
+      for (let gy = 20 * s; gy < 240 * s; gy += 32 * s) {
+        ctx.beginPath();
+        ctx.arc(gx, gy, 1.5 * s, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+  }
+
+  // 2. Top Banner: "News bhi... Meme bhi... 😎" (Left) + "🔴 LIVE" (Right)
+  const topY = 24 * s;
+  ctx.fillStyle = '#ffffff';
+  ctx.font = `bold ${Math.round(20 * s)}px "Outfit", sans-serif`;
+  ctx.textAlign = 'left';
+  ctx.fillText('News bhi...', 32 * s, topY + 24 * s);
+
+  ctx.fillStyle = '#facc15';
+  ctx.font = `900 ${Math.round(22 * s)}px "Outfit", sans-serif`;
+  ctx.fillText('Meme bhi... 😎', 32 * s, topY + 50 * s);
+
+  const liveX = w - 128 * s;
+  const liveY = topY + 14 * s;
+  ctx.fillStyle = '#dc2626';
+  roundRect(ctx, liveX, liveY, 96 * s, 34 * s, 17 * s);
+  ctx.fill();
+  ctx.strokeStyle = '#fca5a5';
+  ctx.lineWidth = 1.5 * s;
+  ctx.stroke();
+
+  ctx.fillStyle = '#ffffff';
+  ctx.beginPath();
+  ctx.arc(liveX + 18 * s, liveY + 17 * s, 5 * s, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = '#ffffff';
+  ctx.font = `900 ${Math.round(14 * s)}px "Outfit", sans-serif`;
+  ctx.fillText('LIVE', liveX + 32 * s, liveY + 23 * s);
+
+  // Shocked Cat Anchor
+  const catCenterX = w / 2;
+  const catCenterY = topY + 115 * s;
+
+  ctx.fillStyle = '#0f172a';
+  ctx.beginPath();
+  ctx.ellipse(catCenterX, catCenterY + 68 * s, 85 * s, 42 * s, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = '#ffffff';
+  ctx.beginPath();
+  ctx.moveTo(catCenterX - 22 * s, catCenterY + 44 * s);
+  ctx.lineTo(catCenterX, catCenterY + 76 * s);
+  ctx.lineTo(catCenterX + 22 * s, catCenterY + 44 * s);
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.fillStyle = '#dc2626';
+  ctx.beginPath();
+  ctx.moveTo(catCenterX - 7 * s, catCenterY + 54 * s);
+  ctx.lineTo(catCenterX + 7 * s, catCenterY + 54 * s);
+  ctx.lineTo(catCenterX + 12 * s, catCenterY + 98 * s);
+  ctx.lineTo(catCenterX, catCenterY + 110 * s);
+  ctx.lineTo(catCenterX - 12 * s, catCenterY + 98 * s);
+  ctx.closePath();
+  ctx.fill();
+
+  const catR = 44 * s;
+  ctx.fillStyle = '#f8fafc';
+  ctx.beginPath();
+  ctx.arc(catCenterX, catCenterY, catR, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = '#92400e';
+  ctx.beginPath();
+  ctx.moveTo(catCenterX - 36 * s, catCenterY - 26 * s);
+  ctx.lineTo(catCenterX - 48 * s, catCenterY - 62 * s);
+  ctx.lineTo(catCenterX - 14 * s, catCenterY - 40 * s);
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.beginPath();
+  ctx.moveTo(catCenterX + 36 * s, catCenterY - 26 * s);
+  ctx.lineTo(catCenterX + 48 * s, catCenterY - 62 * s);
+  ctx.lineTo(catCenterX + 14 * s, catCenterY - 40 * s);
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.fillStyle = '#0f172a';
+  ctx.beginPath();
+  ctx.arc(catCenterX - 18 * s, catCenterY - 8 * s, 10 * s, 0, Math.PI * 2);
+  ctx.arc(catCenterX + 18 * s, catCenterY - 8 * s, 10 * s, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = '#ffffff';
+  ctx.beginPath();
+  ctx.arc(catCenterX - 15 * s, catCenterY - 11 * s, 3.5 * s, 0, Math.PI * 2);
+  ctx.arc(catCenterX + 21 * s, catCenterY - 11 * s, 3.5 * s, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = '#7f1d1d';
+  ctx.beginPath();
+  ctx.ellipse(catCenterX, catCenterY + 18 * s, 16 * s, 20 * s, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = '#f43f5e';
+  ctx.beginPath();
+  ctx.arc(catCenterX, catCenterY + 28 * s, 9 * s, 0, Math.PI);
+  ctx.fill();
+
+  ctx.fillStyle = '#facc15';
+  ctx.font = `900 ${Math.round(44 * s)}px Impact, sans-serif`;
+  ctx.textAlign = 'left';
+  ctx.fillText('!?', catCenterX + 56 * s, catCenterY + 10 * s);
+
+  ctx.fillStyle = '#ffffff';
+  ctx.beginPath();
+  ctx.ellipse(catCenterX - 45 * s, catCenterY + 84 * s, 18 * s, 10 * s, 0, 0, Math.PI * 2);
+  ctx.ellipse(catCenterX + 45 * s, catCenterY + 84 * s, 18 * s, 10 * s, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // 3. BREAKING NEWS Ribbon
+  const ribY = 240 * s;
+  ctx.fillStyle = '#dc2626';
+  ctx.beginPath();
+  ctx.moveTo(24 * s, ribY);
+  ctx.lineTo(w - 24 * s, ribY);
+  ctx.lineTo(w - 38 * s, ribY + 46 * s);
+  ctx.lineTo(24 * s, ribY + 46 * s);
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.fillStyle = '#ffffff';
+  ctx.font = `900 ${Math.round(28 * s)}px Impact, "Outfit", sans-serif`;
+  ctx.textAlign = 'left';
+  ctx.fillText('///  BREAKING NEWS', 40 * s, ribY + 34 * s);
+
+  // 4. White News Card
+  const cardY = 296 * s;
+  const cardH = 120 * s;
+  const cardW = w - 48 * s;
+  const cardX = 24 * s;
+
+  ctx.fillStyle = '#ffffff';
+  roundRect(ctx, cardX, cardY, cardW, cardH, 12 * s);
+  ctx.fill();
+
+  const cleanHead = titleText.replace(/^BREAKING:\s*/i, '').trim();
+  ctx.fillStyle = '#0f172a';
+  ctx.font = `900 ${Math.round(22 * s)}px "Outfit", sans-serif`;
+  ctx.textAlign = 'left';
+  wrapText(ctx, `${cleanHead} 🔥`, cardX + 18 * s, cardY + 36 * s, cardW - 36 * s, 30 * s, 3);
+
+  // 5. Center Framed Video Viewport
+  const vX = 32 * s;
+  const vY = 430 * s;
+  const vW = w - 64 * s;
+  const vH = 370 * s;
+
+  if (overlayOnly) {
+    ctx.clearRect(vX, vY, vW, vH);
+  } else {
+    if (hasVideo && vid) {
+      try {
+        ctx.drawImage(vid, vX, vY, vW, vH);
+      } catch (err) {}
+    } else {
+      ctx.fillStyle = '#050c18';
+      ctx.fillRect(vX, vY, vW, vH);
+    }
+  }
+
+  ctx.strokeStyle = '#ffffff';
+  ctx.lineWidth = 3.5 * s;
+  roundRect(ctx, vX, vY, vW, vH, 8 * s);
+  ctx.stroke();
+
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(vX - 16 * s, vY + 40 * s, 10 * s, 3 * s);
+  ctx.fillRect(vX - 16 * s, vY + 54 * s, 10 * s, 3 * s);
+  ctx.fillRect(vX + vW + 6 * s, vY + 40 * s, 10 * s, 3 * s);
+  ctx.fillRect(vX + vW + 6 * s, vY + 54 * s, 10 * s, 3 * s);
+
+  ctx.fillStyle = '#ffffff';
+  ctx.font = `italic 900 ${Math.round(24 * s)}px "Outfit", cursive, sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.fillText('Tap to Watch', vX + vW / 2, vY + vH - 26 * s);
+
+  ctx.strokeStyle = '#facc15';
+  ctx.lineWidth = 3 * s;
+  ctx.beginPath();
+  ctx.moveTo(vX + vW / 2 - 60 * s, vY + vH - 18 * s);
+  ctx.lineTo(vX + vW / 2 + 60 * s, vY + vH - 18 * s);
+  ctx.stroke();
+
+  // 6. Bottom Buzz Section
+  const buzzY = 820 * s;
+  const buzzH = 350 * s;
+
+  const lolX = 70 * s;
+  const lolY = buzzY + 70 * s;
+  ctx.fillStyle = '#ffffff';
+  ctx.beginPath();
+  ctx.arc(lolX, lolY, 32 * s, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = '#0f172a';
+  ctx.lineWidth = 2.5 * s;
+  ctx.stroke();
+
+  ctx.fillStyle = '#0f172a';
+  ctx.beginPath();
+  ctx.arc(lolX - 10 * s, lolY - 6 * s, 4 * s, 0, Math.PI * 2);
+  ctx.arc(lolX + 10 * s, lolY - 6 * s, 4 * s, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.arc(lolX, lolY + 10 * s, 16 * s, 0, Math.PI);
+  ctx.stroke();
+
+  const bzW = 390 * s;
+  const bzX = 140 * s;
+
+  ctx.fillStyle = '#0f172a';
+  roundRect(ctx, bzX, buzzY, bzW, buzzH, 14 * s);
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(250, 204, 21, 0.4)';
+  ctx.lineWidth = 2 * s;
+  ctx.stroke();
+
+  ctx.fillStyle = '#facc15';
+  roundRect(ctx, bzX + 14 * s, buzzY + 12 * s, 210 * s, 38 * s, 19 * s);
+  ctx.fill();
+
+  ctx.fillStyle = '#0f172a';
+  ctx.font = `900 ${Math.round(17 * s)}px "Outfit", sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.fillText("📢 What's the Buzz?", bzX + 119 * s, buzzY + 37 * s);
+
+  const bzStartY = buzzY + 84 * s;
+  const bzSpacing = 82 * s;
+  highlights.slice(0, 3).forEach((bullet, idx) => {
+    const curY = bzStartY + idx * bzSpacing;
+
+    ctx.fillStyle = '#facc15';
+    ctx.beginPath();
+    ctx.arc(bzX + 24 * s, curY + 6 * s, 6 * s, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = idx === 1 ? '#facc15' : '#ffffff';
+    ctx.font = `bold ${Math.round(16 * s)}px "Plus Jakarta Sans", sans-serif`;
+    ctx.textAlign = 'left';
+    wrapText(ctx, bullet, bzX + 42 * s, curY, bzW - 56 * s, 23 * s, 3);
+  });
+
+  const yaoX = w - 100 * s;
+  const yaoY = buzzY + 80 * s;
+
+  const ybW = 140 * s;
+  const ybH = 50 * s;
+  const ybX = w - 165 * s;
+  const ybY = buzzY + 14 * s;
+
+  ctx.fillStyle = '#ffffff';
+  roundRect(ctx, ybX, ybY, ybW, ybH, 12 * s);
+  ctx.fill();
+
+  ctx.fillStyle = '#0f172a';
+  ctx.font = `bold ${Math.round(13 * s)}px "Plus Jakarta Sans", sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.fillText('Hmm... ', ybX + ybW / 2, ybY + 22 * s);
+  ctx.fillText('Dekhte hai!', ybX + ybW / 2, ybY + 40 * s);
+
+  ctx.fillStyle = '#ffffff';
+  ctx.beginPath();
+  ctx.arc(yaoX, yaoY + 70 * s, 36 * s, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = '#0f172a';
+  ctx.lineWidth = 2.5 * s;
+  ctx.stroke();
+
+  ctx.fillStyle = '#0f172a';
+  ctx.beginPath();
+  ctx.moveTo(yaoX - 22 * s, yaoY + 62 * s);
+  ctx.lineTo(yaoX - 8 * s, yaoY + 60 * s);
+  ctx.moveTo(yaoX + 8 * s, yaoY + 60 * s);
+  ctx.lineTo(yaoX + 22 * s, yaoY + 62 * s);
+  ctx.stroke();
+
+  ctx.beginPath();
+  ctx.arc(yaoX, yaoY + 76 * s, 20 * s, 0, Math.PI);
+  ctx.stroke();
+
+  // 7. Bright Yellow Footer Ribbon
+  const footY = h - 68 * s;
+  ctx.fillStyle = '#facc15';
+  ctx.fillRect(0, footY, w, 68 * s);
+
+  ctx.fillStyle = '#0f172a';
+  ctx.font = `900 ${Math.round(23 * s)}px "Outfit", sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.fillText('Stay Tuned for More Crazy News 😎', w / 2, footY + 44 * s);
+
+  ctx.strokeStyle = '#dc2626';
+  ctx.lineWidth = 3 * s;
+  ctx.beginPath();
+  ctx.moveTo(w / 2 - 120 * s, footY + 54 * s);
+  ctx.lineTo(w / 2 + 120 * s, footY + 54 * s);
+  ctx.stroke();
+}
+
+
+/* ==========================================================================
+   FEATURED #4 TOP TEMPLATE: On Live TV Satire Desk (Panicking Anchor & Sign)
+   Inspired by: media_1794842221370_992c905d.jpg
+   ========================================================================== */
+function drawReelSatireAnchorDeskLayout(ctx, w, h, vid, hasVideo, topHook, caption, publisher, overlayOnly = false, customData = null) {
+  const s = w / 720;
+  const titleText = customData?.topHook || topHook || state.selectedArticle?.title || 'BREAKING: Reporter Drops Shocking Question on Live Broadcast';
+  const descText = customData?.caption || caption || state.selectedArticle?.description || 'Anchor left speechless as viewers react in real time.';
+
+  if (!overlayOnly) {
+    const bgGrad = ctx.createLinearGradient(0, 0, 0, h);
+    bgGrad.addColorStop(0, '#1e293b');
+    bgGrad.addColorStop(0.4, '#0f172a');
+    bgGrad.addColorStop(1, '#020617');
+    ctx.fillStyle = bgGrad;
+    ctx.fillRect(0, 0, w, h);
+
+    ctx.fillStyle = '#334155';
+    ctx.fillRect(40 * s, 10 * s, w - 80 * s, 12 * s);
+
+    ctx.fillStyle = 'rgba(254, 240, 138, 0.08)';
+    ctx.beginPath();
+    ctx.moveTo(120 * s, 22 * s);
+    ctx.lineTo(40 * s, 360 * s);
+    ctx.lineTo(260 * s, 360 * s);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.beginPath();
+    ctx.moveTo(w - 120 * s, 22 * s);
+    ctx.lineTo(w - 260 * s, 360 * s);
+    ctx.lineTo(w - 40 * s, 360 * s);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  // 2. Top Meme Impact Header: "NEWS ANCHOR WHEN SOMEONE ASKS A REAL QUESTION"
+  const topY = 32 * s;
+  ctx.fillStyle = '#ffffff';
+  ctx.font = `900 ${Math.round(25 * s)}px Impact, "Outfit", sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.shadowColor = 'rgba(0, 0, 0, 0.9)';
+  ctx.shadowBlur = 8 * s;
+  ctx.fillText('NEWS ANCHOR WHEN SOMEONE', w / 2, topY + 28 * s);
+
+  ctx.fillStyle = '#ffffff';
+  ctx.fillText('ASKS A ', w / 2 - 70 * s, topY + 62 * s);
+
+  ctx.fillStyle = '#facc15';
+  ctx.fillText('REAL QUESTION', w / 2 + 50 * s, topY + 62 * s);
+  ctx.shadowColor = 'transparent';
+
+  // 3. Studio Monitor Screen (Center Video Window)
+  const vX = 32 * s;
+  const vY = 140 * s;
+  const vW = w - 64 * s;
+  const vH = 410 * s;
+
+  if (overlayOnly) {
+    ctx.clearRect(vX, vY, vW, vH);
+  } else {
+    if (hasVideo && vid) {
+      try {
+        ctx.drawImage(vid, vX, vY, vW, vH);
+      } catch (err) {}
+    } else {
+      ctx.fillStyle = '#020617';
+      ctx.fillRect(vX, vY, vW, vH);
+    }
+  }
+
+  ctx.strokeStyle = '#38bdf8';
+  ctx.lineWidth = 4 * s;
+  roundRect(ctx, vX, vY, vW, vH, 8 * s);
+  ctx.stroke();
+
+  ctx.fillStyle = '#dc2626';
+  roundRect(ctx, vX + 16 * s, vY + 16 * s, 340 * s, 40 * s, 6 * s);
+  ctx.fill();
+
+  ctx.fillStyle = '#ffffff';
+  ctx.font = `900 ${Math.round(20 * s)}px Impact, "Outfit", sans-serif`;
+  ctx.textAlign = 'left';
+  ctx.fillText('LIVE - REAL QUESTION ASKED', vX + 28 * s, vY + 44 * s);
+
+  ctx.fillStyle = 'rgba(15, 23, 42, 0.9)';
+  ctx.fillRect(vX, vY + vH - 34 * s, vW, 34 * s);
+
+  const cleanHead = titleText.replace(/^BREAKING:\s*/i, '').trim();
+  ctx.fillStyle = '#facc15';
+  ctx.font = `bold ${Math.round(14 * s)}px "Plus Jakarta Sans", sans-serif`;
+  ctx.textAlign = 'left';
+  ctx.fillText(`🚨 ${cleanHead.slice(0, 50)}...`, vX + 16 * s, vY + vH - 12 * s);
+
+  // 4. Lower Half: Studio Anchor Desk & Panicking Anchor Character
+  const deskY = 720 * s;
+  const deskCenterX = w / 2;
+
+  ctx.fillStyle = '#1e293b';
+  roundRect(ctx, 24 * s, 580 * s, 160 * s, 110 * s, 6 * s);
+  ctx.fill();
+  ctx.fillStyle = '#dc2626';
+  roundRect(ctx, 28 * s, 584 * s, 152 * s, 26 * s, 4 * s);
+  ctx.fill();
+  ctx.fillStyle = '#ffffff';
+  ctx.font = `900 ${Math.round(13 * s)}px "Outfit", sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.fillText('BUG NEWS HQ', 104 * s, 602 * s);
+
+  const aHeadX = deskCenterX;
+  const aHeadY = 645 * s;
+
+  ctx.fillStyle = '#1e3a8a';
+  ctx.beginPath();
+  ctx.ellipse(aHeadX, aHeadY + 70 * s, 70 * s, 44 * s, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = '#ffffff';
+  ctx.beginPath();
+  ctx.moveTo(aHeadX - 20 * s, aHeadY + 45 * s);
+  ctx.lineTo(aHeadX, aHeadY + 72 * s);
+  ctx.lineTo(aHeadX + 20 * s, aHeadY + 45 * s);
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.fillStyle = '#b91c1c';
+  ctx.beginPath();
+  ctx.moveTo(aHeadX - 6 * s, aHeadY + 54 * s);
+  ctx.lineTo(aHeadX + 6 * s, aHeadY + 54 * s);
+  ctx.lineTo(aHeadX + 10 * s, aHeadY + 95 * s);
+  ctx.lineTo(aHeadX, aHeadY + 105 * s);
+  ctx.lineTo(aHeadX - 10 * s, aHeadY + 95 * s);
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.fillStyle = '#f59e0b';
+  ctx.beginPath();
+  ctx.arc(aHeadX, aHeadY, 44 * s, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = '#ffffff';
+  ctx.beginPath();
+  ctx.arc(aHeadX - 16 * s, aHeadY - 6 * s, 16 * s, 0, Math.PI * 2);
+  ctx.arc(aHeadX + 16 * s, aHeadY - 6 * s, 16 * s, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = '#0f172a';
+  ctx.beginPath();
+  ctx.arc(aHeadX - 14 * s, aHeadY - 6 * s, 7 * s, 0, Math.PI * 2);
+  ctx.arc(aHeadX + 18 * s, aHeadY - 6 * s, 7 * s, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = '#7f1d1d';
+  ctx.beginPath();
+  ctx.ellipse(aHeadX, aHeadY + 22 * s, 18 * s, 14 * s, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = '#38bdf8';
+  [
+    [-34, -20], [-42, 6], [36, -20], [44, 4]
+  ].forEach(([dx, dy]) => {
+    ctx.beginPath();
+    ctx.arc(aHeadX + dx * s, aHeadY + dy * s, 5 * s, 0, Math.PI * 2);
+    ctx.fill();
+  });
+
+  // Crowd Protest Sign
+  const signX = w - 180 * s;
+  const signY = 560 * s;
+  ctx.fillStyle = '#ffffff';
+  ctx.shadowColor = 'rgba(0,0,0,0.5)';
+  ctx.shadowBlur = 10 * s;
+  roundRect(ctx, signX, signY, 150 * s, 85 * s, 8 * s);
+  ctx.fill();
+  ctx.shadowColor = 'transparent';
+
+  ctx.strokeStyle = '#0f172a';
+  ctx.lineWidth = 2 * s;
+  roundRect(ctx, signX, signY, 150 * s, 85 * s, 8 * s);
+  ctx.stroke();
+
+  ctx.fillStyle = '#0f172a';
+  ctx.font = `900 ${Math.round(15 * s)}px Impact, sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.fillText('WHERE ARE', signX + 75 * s, signY + 32 * s);
+  ctx.fillText('THE JOBS?', signX + 75 * s, signY + 58 * s);
+
+  ctx.fillStyle = '#b45309';
+  ctx.fillRect(signX + 70 * s, signY + 85 * s, 8 * s, 60 * s);
+
+  ctx.fillStyle = '#f59e0b';
+  ctx.beginPath();
+  ctx.arc(signX + 74 * s, signY + 160 * s, 26 * s, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Anchor Desk Surface
+  ctx.fillStyle = '#0284c7';
+  roundRect(ctx, 40 * s, deskY, w - 80 * s, 80 * s, 16 * s);
+  ctx.fill();
+
+  const micX1 = deskCenterX - 70 * s;
+  const micX2 = deskCenterX + 70 * s;
+  [micX1, micX2].forEach((mx) => {
+    ctx.fillStyle = '#475569';
+    ctx.fillRect(mx - 3 * s, deskY - 50 * s, 6 * s, 50 * s);
+    ctx.fillStyle = '#dc2626';
+    ctx.fillRect(mx - 14 * s, deskY - 45 * s, 28 * s, 22 * s);
+    ctx.fillStyle = '#ffffff';
+    ctx.font = `900 ${Math.round(10 * s)}px "Outfit", sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.fillText('BNN', mx, deskY - 30 * s);
+    ctx.fillStyle = '#94a3b8';
+    ctx.beginPath();
+    ctx.arc(mx, deskY - 54 * s, 10 * s, 0, Math.PI * 2);
+    ctx.fill();
+  });
+
+  ctx.fillStyle = '#cbd5e1';
+  roundRect(ctx, 80 * s, deskY - 30 * s, 70 * s, 45 * s, 4 * s);
+  ctx.fill();
+
+  // Front Desk Banner
+  const frontY = deskY + 60 * s;
+  const frontH = h - frontY;
+
+  ctx.fillStyle = '#0369a1';
+  ctx.fillRect(0, frontY, w, frontH);
+
+  ctx.fillStyle = '#dc2626';
+  roundRect(ctx, 24 * s, frontY + 30 * s, 130 * s, 90 * s, 10 * s);
+  ctx.fill();
+  ctx.fillStyle = '#ffffff';
+  ctx.font = `900 ${Math.round(22 * s)}px Impact, sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.fillText('BUG', 89 * s, frontY + 68 * s);
+  ctx.fillText('NEWS', 89 * s, frontY + 98 * s);
+
+  ctx.fillStyle = '#ffffff';
+  ctx.font = `900 ${Math.round(48 * s)}px Impact, sans-serif`;
+  ctx.shadowColor = 'rgba(0, 0, 0, 0.8)';
+  ctx.shadowBlur = 14 * s;
+  ctx.fillText('ON LIVE TV', w / 2 + 10 * s, frontY + 92 * s);
+
+  const satX = w - 154 * s;
+  ctx.fillStyle = '#b91c1c';
+  roundRect(ctx, satX, frontY + 30 * s, 130 * s, 90 * s, 10 * s);
+  ctx.fill();
+  ctx.fillStyle = '#ffffff';
+  ctx.font = `900 ${Math.round(18 * s)}px Impact, sans-serif`;
+  ctx.fillText('SATIRE', satX + 65 * s, frontY + 60 * s);
+  ctx.fillText('INDIA', satX + 65 * s, frontY + 85 * s);
+  ctx.fillText('LIVE', satX + 65 * s, frontY + 110 * s);
+  ctx.shadowColor = 'transparent';
+}
+
+
+/* ==========================================================================
+   FEATURED #5 TOP TEMPLATE: Global Summit & 3D Diplomatic Flags
+   Inspired by: media_1794842244993_65a6a729.jpg (Lower Flags & Highlights)
+   ========================================================================== */
+function drawReelGlobalDiplomacyLayout(ctx, w, h, vid, hasVideo, topHook, caption, publisher, overlayOnly = false, customData = null) {
+  const s = w / 720;
+  const titleText = customData?.topHook || topHook || state.selectedArticle?.title || 'BREAKING: Global Diplomatic Summit in Motion';
+  const descText = customData?.caption || caption || state.selectedArticle?.description || 'World leaders unite for historic agreements.';
+  const pubText = customData?.publisher || publisher || state.selectedArticle?.publisher || 'TODAY MEMER';
+
+  const highlights = extractDynamicHighlights(titleText, descText, pubText);
+  const locationTag = extractLocationFromNews(titleText, pubText);
+  const punchlineText = extractDynamicPunchline(titleText, descText);
+
+  if (!overlayOnly) {
+    const bgGrad = ctx.createLinearGradient(0, 0, 0, h);
+    bgGrad.addColorStop(0, '#020617');
+    bgGrad.addColorStop(0.3, '#0b1329');
+    bgGrad.addColorStop(0.7, '#070f20');
+    bgGrad.addColorStop(1, '#02050e');
+    ctx.fillStyle = bgGrad;
+    ctx.fillRect(0, 0, w, h);
+  }
+
+  // 1. Top Bar: // GLOBAL SUMMIT / LIVE
+  const topY = 24 * s;
+  ctx.fillStyle = '#dc2626';
+  ctx.beginPath();
+  ctx.moveTo(24 * s, topY);
+  ctx.lineTo(260 * s, topY);
+  ctx.lineTo(240 * s, topY + 40 * s);
+  ctx.lineTo(24 * s, topY + 40 * s);
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.fillStyle = '#ffffff';
+  ctx.font = `900 ${Math.round(20 * s)}px Impact, "Outfit", sans-serif`;
+  ctx.textAlign = 'left';
+  ctx.fillText('// GLOBAL SUMMIT', 38 * s, topY + 28 * s);
+
+  const liveX = w - 128 * s;
+  ctx.fillStyle = '#dc2626';
+  roundRect(ctx, liveX, topY + 2 * s, 96 * s, 36 * s, 18 * s);
+  ctx.fill();
+  ctx.fillStyle = '#ffffff';
+  ctx.beginPath();
+  ctx.arc(liveX + 18 * s, topY + 20 * s, 5 * s, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.font = `900 ${Math.round(14 * s)}px "Outfit", sans-serif`;
+  ctx.fillText('LIVE', liveX + 32 * s, topY + 25 * s);
+
+  // 2. Headline: Dual Color (Yellow + White)
+  const cleanHead = titleText.replace(/^BREAKING:\s*/i, '').trim();
+  const words = cleanHead.split(/\s+/);
+  const yellowCount = Math.min(3, Math.max(1, Math.floor(words.length * 0.35)));
+  const yellowPart = words.slice(0, yellowCount).join(' ');
+  const whitePart = words.slice(yellowCount).join(' ');
+
+  ctx.font = `900 ${Math.round(25 * s)}px "Outfit", sans-serif`;
+  ctx.textAlign = 'left';
+  wrapTextDualColor(ctx, yellowPart, whitePart, 28 * s, 110 * s, w - 56 * s, 34 * s, 3);
+
+  // 3. Center Video Window (with Location Tag)
+  const vX = 32 * s;
+  const vY = 250 * s;
+  const vW = w - 64 * s;
+  const vH = 380 * s;
+
+  if (overlayOnly) {
+    ctx.clearRect(vX, vY, vW, vH);
+  } else {
+    if (hasVideo && vid) {
+      try {
+        ctx.drawImage(vid, vX, vY, vW, vH);
+      } catch (err) {}
+    } else {
+      ctx.fillStyle = '#060b18';
+      ctx.fillRect(vX, vY, vW, vH);
+    }
+  }
+
+  ctx.strokeStyle = '#ef4444';
+  ctx.lineWidth = 3.5 * s;
+  roundRect(ctx, vX, vY, vW, vH, 10 * s);
+  ctx.stroke();
+
+  ctx.fillStyle = 'rgba(220, 38, 38, 0.95)';
+  roundRect(ctx, vX + 14 * s, vY + 14 * s, 210 * s, 34 * s, 8 * s);
+  ctx.fill();
+  ctx.fillStyle = '#ffffff';
+  ctx.font = `bold ${Math.round(14 * s)}px "Plus Jakarta Sans", sans-serif`;
+  ctx.textAlign = 'left';
+  ctx.fillText(`📍 ${locationTag}`, vX + 26 * s, vY + 37 * s);
+
+  // 4. Middle Split Banner
+  const midY = 650 * s;
+  const midH = 60 * s;
+
+  ctx.fillStyle = '#dc2626';
+  roundRect(ctx, vX, midY, 210 * s, midH, 8 * s);
+  ctx.fill();
+
+  ctx.fillStyle = '#ffffff';
+  ctx.font = `900 ${Math.round(18 * s)}px Impact, "Outfit", sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.fillText('🌐 GLOBAL SUMMIT', vX + 105 * s, midY + 38 * s);
+
+  ctx.fillStyle = '#ffffff';
+  roundRect(ctx, vX + 218 * s, midY, vW - 218 * s, midH, 8 * s);
+  ctx.fill();
+
+  ctx.fillStyle = '#0f172a';
+  ctx.font = `italic bold ${Math.round(15 * s)}px "Plus Jakarta Sans", sans-serif`;
+  ctx.textAlign = 'left';
+  wrapText(ctx, 'A Major Diplomatic Move & World Strategy', vX + 230 * s, midY + 36 * s, vW - 240 * s, 20 * s, 2);
+
+  // 5. Lower Section: KEY HIGHLIGHTS (Left) + 3D Diplomatic Flags & Skyline (Right)
+  const hlY = 730 * s;
+  const hlH = 340 * s;
+  const hlW = 390 * s;
+
+  ctx.fillStyle = 'rgba(15, 23, 42, 0.95)';
+  roundRect(ctx, vX, hlY, hlW, hlH, 14 * s);
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(239, 68, 68, 0.4)';
+  ctx.lineWidth = 1.5 * s;
+  ctx.stroke();
+
+  ctx.fillStyle = '#dc2626';
+  roundRect(ctx, vX + 12 * s, hlY + 12 * s, 180 * s, 32 * s, 16 * s);
+  ctx.fill();
+  ctx.fillStyle = '#ffffff';
+  ctx.font = `900 ${Math.round(14 * s)}px "Outfit", sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.fillText('KEY HIGHLIGHTS >>', vX + 102 * s, hlY + 33 * s);
+
+  const bStartY = hlY + 74 * s;
+  const bSpacing = 84 * s;
+  highlights.slice(0, 3).forEach((bullet, idx) => {
+    const curY = bStartY + idx * bSpacing;
+
+    ctx.fillStyle = '#facc15';
+    ctx.font = `900 ${Math.round(20 * s)}px "Outfit", sans-serif`;
+    ctx.textAlign = 'left';
+    ctx.fillText('✔', vX + 16 * s, curY + 8 * s);
+
+    ctx.fillStyle = '#ffffff';
+    ctx.font = `600 ${Math.round(15 * s)}px "Plus Jakarta Sans", sans-serif`;
+    wrapText(ctx, bullet, vX + 44 * s, curY, hlW - 56 * s, 22 * s, 3);
+  });
+
+  // Right Side: 3D Diplomatic Flags & City Skyline
+  const flagCardX = vX + hlW + 12 * s;
+  const flagCardW = w - flagCardX - 32 * s;
+  const flagCardH = hlH;
+
+  ctx.fillStyle = '#0f172a';
+  roundRect(ctx, flagCardX, hlY, flagCardW, flagCardH, 14 * s);
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(56, 189, 248, 0.4)';
+  ctx.lineWidth = 1.5 * s;
+  ctx.stroke();
+
+  ctx.fillStyle = '#1e293b';
+  for (let bx = flagCardX + 10 * s; bx < flagCardX + flagCardW - 10 * s; bx += 24 * s) {
+    const bHeight = (40 + ((bx * 7) % 60)) * s;
+    ctx.fillRect(bx, hlY + flagCardH - bHeight, 20 * s, bHeight);
+  }
+
+  const pole1X = flagCardX + 35 * s;
+  const pole2X = flagCardX + flagCardW / 2 + 10 * s;
+  const pole3X = flagCardX + flagCardW - 25 * s;
+
+  [pole1X, pole2X, pole3X].forEach((px) => {
+    ctx.fillStyle = '#cbd5e1';
+    ctx.fillRect(px - 2 * s, hlY + 50 * s, 4 * s, 180 * s);
+    ctx.fillStyle = '#facc15';
+    ctx.beginPath();
+    ctx.arc(px, hlY + 48 * s, 4 * s, 0, Math.PI * 2);
+    ctx.fill();
+  });
+
+  ctx.fillStyle = '#1e3a8a';
+  ctx.fillRect(pole1X, hlY + 54 * s, 26 * s, 20 * s);
+  ctx.fillStyle = '#dc2626';
+  ctx.fillRect(pole1X + 26 * s, hlY + 54 * s, 34 * s, 10 * s);
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(pole1X + 26 * s, hlY + 64 * s, 34 * s, 10 * s);
+
+  ctx.fillStyle = '#ea580c';
+  ctx.fillRect(pole2X, hlY + 54 * s, 55 * s, 10 * s);
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(pole2X + 64 * s, hlY + 64 * s, 55 * s, 10 * s);
+  ctx.fillStyle = '#16a34a';
+  ctx.fillRect(pole2X, hlY + 74 * s, 55 * s, 10 * s);
+
+  // 6. Slanted Big Punchline
+  const punchY = 1100 * s;
+  ctx.textAlign = 'center';
+  ctx.font = `italic 900 ${Math.round(26 * s)}px "Outfit", sans-serif`;
+
+  const pGrad = ctx.createLinearGradient(40 * s, punchY, w - 40 * s, punchY);
+  pGrad.addColorStop(0, '#ffffff');
+  pGrad.addColorStop(0.5, '#fde047');
+  pGrad.addColorStop(1, '#facc15');
+  ctx.fillStyle = pGrad;
+  wrapText(ctx, punchlineText, w / 2, punchY, w - 60 * s, 32 * s, 2);
+
+  // 7. Footer Bar
+  const footY = h - 60 * s;
+  ctx.fillStyle = '#dc2626';
+  ctx.fillRect(0, footY, w, 2.5 * s);
+  ctx.fillStyle = '#070b15';
+  ctx.fillRect(0, footY + 2.5 * s, w, 58 * s);
+
+  ctx.fillStyle = '#94a3b8';
+  ctx.font = `bold ${Math.round(13 * s)}px "Plus Jakarta Sans", sans-serif`;
+  ctx.textAlign = 'left';
+  ctx.fillText('🌐 Stay Tuned for More Updates...', 28 * s, footY + 36 * s);
+
+  ctx.fillStyle = '#facc15';
+  ctx.textAlign = 'right';
+  ctx.fillText('#GlobalSummit #BreakingNews #World', w - 28 * s, footY + 36 * s);
+}
+
+
 /* Layout 8: Split-Screen News Card */
 function drawReelSplitLayout(targetCtx, w, h, vid, hasVideo, topHook, caption, publisher, overlayOnly = false) {
   const ctx = targetCtx || reelCtx;
@@ -4866,7 +6027,7 @@ function getReelOverlayDataUrl(customData = null) {
   const publisher = customData?.publisher || state.selectedArticle?.publisher || 'TODAY MEMER';
   const layout = customData?.layout || reelState.layout;
 
-  renderSelectedLayout(ctx, w, h, null, false, topHook, caption, publisher, true, layout, customData);
+  renderSelectedLayout(ctx, w, h, null, false, topHook, caption, publisher, true, layout);
   return offCanvas.toDataURL('image/png');
 }
 
@@ -4901,7 +6062,7 @@ async function exportReelVideo() {
         quality_enhancement: reelState.qualityEnhance !== false,
         overlay: overlay,
         layout: reelState.layout,
-        duration: reelState.duration || 20,
+        duration: reelState.duration || 12,
         quality: reelState.quality || 'hd1080',
         color_grade: reelState.colorGrade || 'none'
       })
@@ -5436,7 +6597,7 @@ async function openPublishModalForReel() {
             video_name: videoName,
             overlay: overlay,
             layout: reelState.layout,
-            duration: reelState.duration || 20
+            duration: 12
           })
         });
         const data = await res.json();
@@ -5538,7 +6699,7 @@ async function executeInstagramPublish() {
             video_name: videoName,
             overlay: overlay,
             layout: reelState.layout,
-            duration: reelState.duration || 20,
+            duration: reelState.duration || 12,
             quality: reelState.quality || 'hd1080',
             color_grade: reelState.colorGrade || 'none'
           })
@@ -5614,6 +6775,10 @@ async function executeInstagramPublish() {
    ========================================================================== */
 const BATCH_PATTERNS = [
   'reel_broadcast_highlights',
+  'reel_tom_doge_newspaper',
+  'reel_anchor_cat_buzz',
+  'reel_satire_anchor_desk',
+  'reel_global_diplomacy',
   'reel_split',
   'reel_chyron',
   'reel_unusual_whales',
@@ -5646,6 +6811,10 @@ const batchState = {
 function formatPatternName(layout) {
   const map = {
     'reel_broadcast_highlights': '🔴 Viral Breaking Highlights',
+    'reel_tom_doge_newspaper': '🐶 Tom & Doge Vintage Newspaper',
+    'reel_anchor_cat_buzz': '🐱 News bhi Meme bhi (Cat Anchor)',
+    'reel_satire_anchor_desk': '📺 On Live TV Satire Desk',
+    'reel_global_diplomacy': '🌍 Global Summit & 3D Flags',
     'reel_split': 'Split Breaking News',
     'reel_chyron': 'Live TV Chyron',
     'reel_unusual_whales': 'Unusual Whales Alert',
@@ -5665,7 +6834,7 @@ function formatPatternName(layout) {
     'reel_before_after': 'Expectation vs Reality',
     'reel_impact': 'Impact Meme Classic'
   };
-  return map[layout] || '🔴 Viral Breaking Highlights';
+  return map[layout] || 'Split Breaking News';
 }
 
 function extractSearchKeywords(title) {
@@ -5989,7 +7158,6 @@ async function startBatchWorkflow() {
   const autoPostIg = elements.batchAutoPostIgToggle ? elements.batchAutoPostIgToggle.checked : true;
   const postDelaySec = parseInt(elements.batchPostDelaySelect?.value || '10', 10);
   const speedQuality = document.getElementById('batchSpeedSelect')?.value || 'fast_720';
-  const batchDuration = parseInt(document.getElementById('batchDurationSelect')?.value || '20', 10);
 
   showToast('⚡ Pre-rendering overlays & starting Termux background worker...', 'info');
 
@@ -6017,7 +7185,6 @@ async function startBatchWorkflow() {
       publisher: art.publisher || '',
       category: state.currentTopic || '',
       pattern: pattern,
-      duration: batchDuration,
       manualUrl: art.manualVideoUrl || (isManualSource ? globalManualUrl : ''),
       overlay: overlayPng,
       overlayData: overlayPng,
@@ -6050,8 +7217,7 @@ async function startBatchWorkflow() {
         items: preparedItems,
         auto_post_ig: autoPostIg,
         post_delay_sec: postDelaySec,
-        quality: speedQuality,
-        duration: batchDuration
+        quality: speedQuality
       })
     });
     const data = await res.json();
