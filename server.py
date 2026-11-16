@@ -273,19 +273,29 @@ def get_video_info(file_path):
 def ensure_sample_reel_exists():
     """Ensure sample_reel.mp4 exists in media/videos directory so fallback never fails."""
     sample_path = os.path.join(VIDEO_DIR, "sample_reel.mp4")
-    if not os.path.exists(sample_path) or os.path.getsize(sample_path) < 1000:
+    # Regenerate if file missing or shorter than 15 seconds
+    need_create = not os.path.exists(sample_path) or os.path.getsize(sample_path) < 1000
+    if not need_create:
         try:
-            print("[SERVER] Creating resilient sample_reel.mp4 background video...")
+            info = get_video_info(sample_path)
+            if info.get("duration", 0) < 15:
+                need_create = True
+        except Exception:
+            pass
+
+    if need_create:
+        try:
+            print("[SERVER] Creating resilient 25s sample_reel.mp4 background video...")
             cmd = [
                 FFMPEG_PATH, "-y",
-                "-f", "lavfi", "-i", "color=c=#0f172a:s=720x1280:d=10:r=30",
+                "-f", "lavfi", "-i", "color=c=#0b1120:s=720x1280:d=25:r=30",
                 "-f", "lavfi", "-i", "anullsrc=channel_layout=stereo:sample_rate=44100",
                 "-c:v", "libx264", "-pix_fmt", "yuv420p", "-preset", "veryfast",
                 "-c:a", "aac", "-b:a", "128k",
-                "-t", "10", "-movflags", "+faststart",
+                "-t", "25", "-movflags", "+faststart",
                 sample_path
             ]
-            subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=20)
+            subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=25)
         except Exception as e:
             print(f"[SERVER] Note on sample_reel creation: {e}")
     return sample_path
@@ -1365,8 +1375,8 @@ def compose_multi_clip_reel(
     clips=None,
     vid_name="sample_reel.mp4",
     overlay_data="",
-    layout="reel_split",
-    duration=12,
+    layout="reel_broadcast_highlights",
+    duration=20,
     quality="hd1080",
     color_grade="none",
     collab_mode="single",
@@ -1455,7 +1465,7 @@ def compose_multi_clip_reel(
     cmd_inputs = []
 
     for c_path in resolved_clips:
-        cmd_inputs.extend(["-i", c_path])
+        cmd_inputs.extend(["-stream_loop", "-1", "-i", c_path])
     cmd_inputs.extend(["-i", overlay_path])
 
     filter_complex = ""
@@ -1534,15 +1544,28 @@ def compose_multi_clip_reel(
         filter_complex = f"{v_filter};{a_filter}"
 
     else:
-        # Single Video / Split News Layout
+        # Single Video / Highlights / Split News Layout
         has_audio = check_video_has_audio(resolved_clips[0])
-        if layout == "reel_split":
+        if layout == "reel_broadcast_highlights":
+            # High-end Broadcast 16:9 center window
+            v_x = int(28 * (target_w / 720))
+            v_y = int(270 * (target_h / 1280))
+            v_w = int(664 * (target_w / 720))
+            v_h = int(390 * (target_h / 1280))
+            v_filter = (
+                f"color=c=#070b14:s={target_w}x{target_h}:r=30[bg];"
+                f"[0:v]trim=0:{duration},setpts=PTS-STARTPTS,{enh_step}{grade_step}scale={v_w}:{v_h}:flags=bicubic:force_original_aspect_ratio=increase,crop={v_w}:{v_h}[vid];"
+                f"[bg][vid]overlay={v_x}:{v_y}[base];"
+                f"[1:v]scale={target_w}:{target_h}:flags=bicubic[ovl];"
+                f"[base][ovl]overlay=0:0[v]"
+            )
+        elif layout == "reel_split":
             card_h = int(510 * (target_h / 1280))
             vid_h = target_h - card_h
             v_filter = (
                 f"color=c=black:s={target_w}x{target_h}:r=30[bg];"
                 f"[0:v]trim=0:{duration},setpts=PTS-STARTPTS,{enh_step}{grade_step}scale={target_w}:{vid_h}:flags=bicubic:force_original_aspect_ratio=increase,crop={target_w}:{vid_h}[vid];"
-                f"[bg][vid]overlay=0:{card_h}:shortest=1[base];"
+                f"[bg][vid]overlay=0:{card_h}[base];"
                 f"[1:v]scale={target_w}:{target_h}:flags=bicubic[ovl];"
                 f"[base][ovl]overlay=0:0[v]"
             )
@@ -1690,9 +1713,10 @@ class BatchReelEngine:
         self.auto_post_ig = True
         self.post_delay_sec = 10
         self.quality = "fast_720"
+        self.duration = 20
         self._thread = None
 
-    def start(self, items, auto_post_ig=True, post_delay_sec=10, quality="fast_720"):
+    def start(self, items, auto_post_ig=True, post_delay_sec=10, quality="fast_720", duration=20):
         if shutil.which("termux-wake-lock"):
             try:
                 subprocess.run(["termux-wake-lock"], check=False)
@@ -1717,6 +1741,7 @@ class BatchReelEngine:
             self.auto_post_ig = bool(auto_post_ig)
             self.post_delay_sec = max(3, int(post_delay_sec))
             self.quality = quality or "fast_720"
+            self.duration = max(5, int(duration or 20))
             self.task_id = f"batch_{int(self.start_time)}"
 
             self._thread = threading.Thread(target=self._worker_loop, daemon=True)
@@ -1847,11 +1872,12 @@ class BatchReelEngine:
                     self.step = 3
                     self.step_text = f"Story {idx + 1}/{self.total}: Rendering 9:16 HD Reel ({self.quality})..."
 
+                item_dur = int(item.get("duration") or self.duration or 20)
                 composed_name, composed_path = compose_multi_clip_reel(
                     vid_name=video_filename,
                     overlay_data=overlay_data,
                     layout=pattern,
-                    duration=12,
+                    duration=item_dur,
                     quality=self.quality,
                     quality_enhancement=False
                 )
@@ -2143,9 +2169,10 @@ class NewsServerHandler(http.server.SimpleHTTPRequestHandler):
             auto_post = payload.get("auto_post_ig", True)
             post_delay = payload.get("post_delay_sec", 10)
             quality = payload.get("quality", "fast_720")
+            duration = int(payload.get("duration", 20))
             if not items:
                 return self.send_json({"error": "No articles provided for batch processing"}, status=400)
-            res = BATCH_ENGINE.start(items, auto_post_ig=auto_post, post_delay_sec=post_delay, quality=quality)
+            res = BATCH_ENGINE.start(items, auto_post_ig=auto_post, post_delay_sec=post_delay, quality=quality, duration=duration)
             return self.send_json(res)
 
         if path == "/api/batch-worker/stop":
@@ -2361,7 +2388,7 @@ class NewsServerHandler(http.server.SimpleHTTPRequestHandler):
             quality_enhancement = bool(payload.get("quality_enhancement", True))
             overlay = payload.get("overlay", "")
             layout = payload.get("layout", "reel_split")
-            duration = int(payload.get("duration", 12))
+            duration = int(payload.get("duration", 20))
             quality = payload.get("quality", "hd1080")
             color_grade = payload.get("color_grade", "none")
 
@@ -2532,7 +2559,7 @@ class NewsServerHandler(http.server.SimpleHTTPRequestHandler):
                 if not target_path and overlay:
                     try:
                         print(f"[INSTAGRAM] Composing source video '{video_name}' with custom overlay for layout '{layout}'...")
-                        composed_name, composed_path = compose_reel_video(video_name, overlay, layout=layout, duration=12)
+                        composed_name, composed_path = compose_reel_video(video_name, overlay, layout=layout, duration=int(payload.get("duration", 20)))
                         target_path = composed_path
                         print(f"[INSTAGRAM] Composed reel ready: {target_path}")
                     except Exception as ce:

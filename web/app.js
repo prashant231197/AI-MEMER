@@ -275,17 +275,17 @@ const igState = {
   pendingVideoName: null
 };
 
-// Reel Studio State (20 Patterns & HD Master Suite)
+// Reel Studio State (21 Patterns & HD Master Suite)
 const reelState = {
-  layout: 'reel_split', // 1 of 20 viral layout patterns
-  vibe: 'dark',
-  topHook: 'BREAKING: Nobody noticed this glitch in the simulation',
-  caption: 'When the truth hits harder than your morning coffee.',
-  locationTag: 'r/AskReddit • 42.8k Upvotes',
-  subBadge: 'LIVE BROADCAST 🚨',
+  layout: 'reel_broadcast_highlights', // Featured #1 Viral 3D Breaking Highlights template
+  vibe: 'news',
+  topHook: 'BREAKING: Major Global Diplomatic Breakthrough Announced',
+  caption: 'World leaders agree on new framework during high-stakes summit.',
+  locationTag: '📍 Global Newsroom',
+  subBadge: '🔴 BREAKING NEWS',
   colorGrade: 'none',
   quality: 'hd1080', // 'hd1080' | 'hd720'
-  duration: 12,
+  duration: 20, // 20 Seconds Optimal Reel Length
   darken: 15,
   isPlaying: false,
   isMuted: true,
@@ -2367,8 +2367,8 @@ async function autoCreateCollabEdit() {
         collab_mode: reelState.collabMode || 'sequence',
         quality_enhancement: reelState.qualityEnhance !== false,
         overlay: overlay,
-        layout: reelState.layout || 'reel_split',
-        duration: reelState.duration || 12,
+        layout: reelState.layout || 'reel_broadcast_highlights',
+        duration: reelState.duration || 20,
         quality: reelState.quality || 'hd1080',
         color_grade: reelState.colorGrade || 'none'
       })
@@ -3322,6 +3322,533 @@ function drawReelSimulationGlitchLayout(targetCtx, w, h, vid, hasVideo, topHook,
   wrapText(ctx, caption, 50 * s, bY + 70 * s, w - 100 * s, 26 * s, 3);
 }
 
+/* ==========================================================================
+   FEATURED #1 TOP TEMPLATE: Viral 3D Breaking News & Key Highlights Broadcast
+   Inspired by High-Octane TV Studio & Viral News Reels (Dual-tone Headline,
+   Framed Video Window, Dynamic Key Highlights, Meme Accent & Slanted Punchline)
+   ========================================================================== */
+
+function extractLocationFromNews(title = '', publisher = '', category = '') {
+  const t = `${title} ${publisher} ${category}`;
+  const known = [
+    'Washington', 'New York', 'White House', 'Beijing', 'Shenzhen', 'Moscow', 'London', 
+    'Paris', 'Berlin', 'Tokyo', 'Delhi', 'Mumbai', 'Kyiv', 'Ukraine', 'Israel', 'Gaza',
+    'Middle East', 'United States', 'US', 'China', 'Russia', 'India', 'Canada', 'Europe'
+  ];
+  for (const k of known) {
+    const reg = new RegExp(`\\b${k}\\b`, 'i');
+    if (reg.test(t)) {
+      const country = (k === 'Delhi' || k === 'Mumbai') ? 'India' : 
+                      (k === 'Shenzhen' || k === 'Beijing') ? 'China' : 
+                      (k === 'Washington' || k === 'New York' || k === 'White House') ? 'USA' : 
+                      (k === 'London') ? 'UK' : 
+                      (k === 'Moscow') ? 'Russia' : 'Global';
+      return `${k}, ${country}`;
+    }
+  }
+  return publisher ? `${publisher.slice(0, 16)} Desk` : 'World Newsroom';
+}
+
+function extractDynamicHighlights(title = '', caption = '', publisher = '') {
+  const cleanTitle = (title || '').replace(/^BREAKING:\s*/i, '').trim();
+  const cleanDesc = (caption || '').trim();
+  const sentences = cleanDesc.split(/[.?!]\s+/).filter(s => s.trim().length > 6);
+
+  let b1 = cleanTitle.length > 55 ? cleanTitle.slice(0, 52) + '...' : cleanTitle;
+  let b2 = sentences[0] || `Key developments confirmed by ${publisher || 'international sources'}.`;
+  if (b2.length > 55) b2 = b2.slice(0, 52) + '...';
+
+  let b3 = sentences[1] || (
+    cleanTitle.toLowerCase().includes('summit') ? 'Hope for diplomatic breakthrough?' :
+    cleanTitle.toLowerCase().includes('crash') || cleanTitle.toLowerCase().includes('drop') ? 'Markets & investors on high alert?' :
+    cleanTitle.toLowerCase().includes('ai') || cleanTitle.toLowerCase().includes('tech') ? 'Major technological shifts ahead?' :
+    'Global public reaction under watch?'
+  );
+  if (b3.length > 55) b3 = b3.slice(0, 52) + '...';
+
+  return [b1, b2, b3];
+}
+
+function extractDynamicPunchline(title = '', caption = '') {
+  const t = (title || '').toLowerCase();
+  if (t.includes('summit') || t.includes('peace') || t.includes('talks')) {
+    return 'A Step Towards a More Connected World?';
+  }
+  if (t.includes('market') || t.includes('stock') || t.includes('gold') || t.includes('economy') || t.includes('crash')) {
+    return 'Will This Shake Global Markets Tomorrow?';
+  }
+  if (t.includes('ai') || t.includes('tech') || t.includes('google') || t.includes('nvidia') || t.includes('robot')) {
+    return 'The Future Is Arriving Faster Than We Thought?';
+  }
+  if (t.includes('war') || t.includes('strike') || t.includes('military') || t.includes('attack')) {
+    return 'Tensions Escalate: What Happens Next?';
+  }
+  return 'A Turning Point in Today\'s Headlines?';
+}
+
+function wrapTextDualColor(ctx, yellowPart, whitePart, x, y, maxW, lineH, maxLines = 3) {
+  const fullText = `${yellowPart} ${whitePart}`.trim();
+  const words = fullText.split(/\s+/);
+  const yellowWordCount = yellowPart.split(/\s+/).filter(Boolean).length;
+
+  let lines = [];
+  let currentLine = [];
+
+  for (let i = 0; i < words.length; i++) {
+    const testLine = [...currentLine, words[i]].join(' ');
+    const testW = ctx.measureText(testLine).width;
+    if (testW > maxW && currentLine.length > 0) {
+      lines.push(currentLine);
+      currentLine = [words[i]];
+      if (lines.length >= maxLines) break;
+    } else {
+      currentLine.push(words[i]);
+    }
+  }
+  if (currentLine.length > 0 && lines.length < maxLines) {
+    lines.push(currentLine);
+  }
+
+  let wordIdx = 0;
+  lines.forEach((lineWords, lIdx) => {
+    let curX = x;
+    const curY = y + lIdx * lineH;
+
+    lineWords.forEach((word) => {
+      const isYellow = wordIdx < yellowWordCount;
+      ctx.fillStyle = isYellow ? '#facc15' : '#ffffff';
+      ctx.fillText(word, curX, curY);
+      curX += ctx.measureText(word + ' ').width;
+      wordIdx++;
+    });
+  });
+
+  return y + lines.length * lineH;
+}
+
+function drawViralMascotBadge(ctx, x, y, w, h, s) {
+  // Speech Bubble
+  const bubbleY = y + 16 * s;
+  ctx.fillStyle = '#ffffff';
+  roundRect(ctx, x + 12 * s, bubbleY, w - 24 * s, 62 * s, 10 * s);
+  ctx.fill();
+
+  ctx.fillStyle = '#0f172a';
+  ctx.font = `bold ${Math.round(13 * s)}px "Outfit", sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.fillText('What\'s Next?', x + w / 2, bubbleY + 25 * s);
+  ctx.font = `600 ${Math.round(12 * s)}px "Plus Jakarta Sans", sans-serif`;
+  ctx.fillStyle = '#475569';
+  ctx.fillText('Dekhte hai! 👀', x + w / 2, bubbleY + 46 * s);
+
+  // Bubble tail
+  ctx.fillStyle = '#ffffff';
+  ctx.beginPath();
+  ctx.moveTo(x + w / 2 - 8 * s, bubbleY + 62 * s);
+  ctx.lineTo(x + w / 2 + 8 * s, bubbleY + 62 * s);
+  ctx.lineTo(x + w / 2, bubbleY + 72 * s);
+  ctx.closePath();
+  ctx.fill();
+
+  // Cool Mascot / Doge with Pixel Sunglasses
+  const faceCenterX = x + w / 2;
+  const faceCenterY = y + 172 * s;
+  const faceRadius = 45 * s;
+
+  // Golden head
+  const headGrad = ctx.createRadialGradient(faceCenterX, faceCenterY, 5 * s, faceCenterX, faceCenterY, faceRadius);
+  headGrad.addColorStop(0, '#fef08a');
+  headGrad.addColorStop(0.7, '#facc15');
+  headGrad.addColorStop(1, '#ca8a04');
+  ctx.fillStyle = headGrad;
+  ctx.beginPath();
+  ctx.arc(faceCenterX, faceCenterY, faceRadius, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Ears
+  ctx.fillStyle = '#ca8a04';
+  ctx.beginPath();
+  ctx.moveTo(faceCenterX - 35 * s, faceCenterY - 30 * s);
+  ctx.lineTo(faceCenterX - 50 * s, faceCenterY - 60 * s);
+  ctx.lineTo(faceCenterX - 15 * s, faceCenterY - 40 * s);
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.beginPath();
+  ctx.moveTo(faceCenterX + 35 * s, faceCenterY - 30 * s);
+  ctx.lineTo(faceCenterX + 50 * s, faceCenterY - 60 * s);
+  ctx.lineTo(faceCenterX + 15 * s, faceCenterY - 40 * s);
+  ctx.closePath();
+  ctx.fill();
+
+  // Cool Black Sunglasses
+  ctx.fillStyle = '#0f172a';
+  ctx.fillRect(faceCenterX - 40 * s, faceCenterY - 14 * s, 36 * s, 22 * s);
+  ctx.fillRect(faceCenterX + 4 * s, faceCenterY - 14 * s, 36 * s, 22 * s);
+  ctx.fillRect(faceCenterX - 6 * s, faceCenterY - 10 * s, 12 * s, 6 * s);
+
+  // White Pixel Reflection on glasses
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(faceCenterX - 34 * s, faceCenterY - 10 * s, 8 * s, 8 * s);
+  ctx.fillRect(faceCenterX + 10 * s, faceCenterY - 10 * s, 8 * s, 8 * s);
+
+  // Snout & Nose
+  ctx.fillStyle = '#fef08a';
+  ctx.beginPath();
+  ctx.arc(faceCenterX, faceCenterY + 16 * s, 18 * s, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = '#1e293b';
+  ctx.beginPath();
+  ctx.arc(faceCenterX, faceCenterY + 12 * s, 6 * s, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Smirk
+  ctx.strokeStyle = '#1e293b';
+  ctx.lineWidth = 2 * s;
+  ctx.beginPath();
+  ctx.arc(faceCenterX, faceCenterY + 18 * s, 10 * s, 0.2, Math.PI - 0.2);
+  ctx.stroke();
+
+  // Tag below mascot
+  ctx.fillStyle = '#38bdf8';
+  ctx.font = `bold ${Math.round(11 * s)}px "Outfit", sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.fillText('MEME VIRAL DESK', faceCenterX, y + 265 * s);
+}
+
+/* Layout 1: Viral Breaking Highlights Broadcast (Top Featured #1) */
+function drawReelBroadcastHighlightsLayout(targetCtx, w, h, vid, hasVideo, topHook, caption, publisher, overlayOnly = false, customData = null) {
+  const ctx = targetCtx || reelCtx;
+  const s = w / 720;
+
+  const titleText = (topHook || customData?.topHook || 'BREAKING: Major Global Diplomatic Breakthrough').trim();
+  const descText = (caption || customData?.caption || state.selectedArticle?.title || 'World leaders agree on new framework during high-stakes summit.').trim();
+  const pubText = (publisher || customData?.publisher || state.selectedArticle?.publisher || 'TODAY MEMER').trim();
+  const catText = (customData?.category || state.currentTopic || 'BREAKING NEWS').toUpperCase();
+  const locText = customData?.location || extractLocationFromNews(titleText, pubText, catText);
+  const highlights = customData?.highlights || extractDynamicHighlights(titleText, descText, pubText);
+  const punchlineText = customData?.punchline || extractDynamicPunchline(titleText, descText);
+
+  // 1. Background Atmosphere (Studio Space & Red Atmospheric Glow)
+  if (!overlayOnly) {
+    const bgGrad = ctx.createLinearGradient(0, 0, 0, h);
+    bgGrad.addColorStop(0, '#040711');
+    bgGrad.addColorStop(0.25, '#0a0f1d');
+    bgGrad.addColorStop(0.55, '#0f172a');
+    bgGrad.addColorStop(0.85, '#070b15');
+    bgGrad.addColorStop(1, '#020408');
+    ctx.fillStyle = bgGrad;
+    ctx.fillRect(0, 0, w, h);
+
+    // Atmospheric Top Red Glow
+    const glowGrad = ctx.createRadialGradient(w / 2, 0, 10 * s, w / 2, 0, 360 * s);
+    glowGrad.addColorStop(0, 'rgba(239, 68, 68, 0.35)');
+    glowGrad.addColorStop(0.5, 'rgba(220, 38, 38, 0.12)');
+    glowGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+    ctx.fillStyle = glowGrad;
+    ctx.fillRect(0, 0, w, 400 * s);
+  }
+
+  // 2. Top Header Bar (Channel Tag & Glowing LIVE indicator)
+  // Left: Channel / Desk pill
+  ctx.fillStyle = 'rgba(15, 23, 42, 0.85)';
+  roundRect(ctx, 28 * s, 18 * s, 210 * s, 32 * s, 16 * s);
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(239, 68, 68, 0.5)';
+  ctx.lineWidth = 1.5 * s;
+  ctx.stroke();
+
+  ctx.fillStyle = '#f8fafc';
+  ctx.font = `bold ${Math.round(12 * s)}px "Plus Jakarta Sans", sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.fillText(`⚡ ${pubText.slice(0, 16).toUpperCase()} BROADCAST`, 133 * s, 39 * s);
+
+  // Right: LIVE glowing pill
+  const liveX = w - 120 * s;
+  ctx.fillStyle = '#dc2626';
+  roundRect(ctx, liveX, 18 * s, 92 * s, 32 * s, 16 * s);
+  ctx.fill();
+
+  // Pulsing Live Dot
+  ctx.fillStyle = '#ffffff';
+  ctx.beginPath();
+  ctx.arc(liveX + 20 * s, 34 * s, 5 * s, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = '#ffffff';
+  ctx.font = `900 ${Math.round(14 * s)}px "Outfit", sans-serif`;
+  ctx.textAlign = 'left';
+  ctx.fillText('LIVE', liveX + 32 * s, 39 * s);
+
+  // 3. BREAKING NEWS 3D Slanted Ribbon (Parallelogram)
+  const ribY = 62 * s;
+  const ribH = 46 * s;
+  const slant = 14 * s;
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.moveTo(24 * s + slant, ribY);
+  ctx.lineTo(w - 24 * s, ribY);
+  ctx.lineTo(w - 24 * s - slant, ribY + ribH);
+  ctx.lineTo(24 * s, ribY + ribH);
+  ctx.closePath();
+
+  const ribGrad = ctx.createLinearGradient(0, ribY, w, ribY + ribH);
+  ribGrad.addColorStop(0, '#ef4444');
+  ribGrad.addColorStop(0.5, '#dc2626');
+  ribGrad.addColorStop(1, '#991b1b');
+  ctx.fillStyle = ribGrad;
+  ctx.shadowColor = 'rgba(220, 38, 38, 0.6)';
+  ctx.shadowBlur = 16 * s;
+  ctx.fill();
+  ctx.restore();
+
+  // Yellow chevron slashes on left
+  ctx.fillStyle = '#facc15';
+  ctx.font = `900 ${Math.round(24 * s)}px "Outfit", sans-serif`;
+  ctx.textAlign = 'left';
+  ctx.fillText('//', 44 * s, ribY + 32 * s);
+
+  // Text "BREAKING"
+  ctx.fillStyle = '#ffffff';
+  ctx.font = `900 ${Math.round(26 * s)}px "Outfit", Impact, sans-serif`;
+  ctx.fillText('BREAKING', 76 * s, ribY + 33 * s);
+
+  // White "NEWS" Inverted Badge
+  ctx.fillStyle = '#ffffff';
+  roundRect(ctx, 230 * s, ribY + 6 * s, 100 * s, 34 * s, 6 * s);
+  ctx.fill();
+
+  ctx.fillStyle = '#b91c1c';
+  ctx.font = `900 ${Math.round(22 * s)}px "Outfit", Impact, sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.fillText('NEWS', 280 * s, ribY + 31 * s);
+
+  // 4. Headline Section (Dual-Color Electric Yellow & Crisp White)
+  const cleanHead = titleText.replace(/^BREAKING:\s*/i, '').trim();
+  const words = cleanHead.split(/\s+/);
+  const yellowCount = Math.min(3, Math.max(1, Math.floor(words.length * 0.35)));
+  const yellowPart = words.slice(0, yellowCount).join(' ');
+  const whitePart = words.slice(yellowCount).join(' ');
+
+  ctx.shadowColor = 'rgba(0, 0, 0, 0.95)';
+  ctx.shadowBlur = 12 * s;
+  ctx.shadowOffsetY = 2 * s;
+  ctx.textAlign = 'left';
+
+  const headStartX = 28 * s;
+  const headMaxW = w - 56 * s;
+  const headLineH = 34 * s;
+  const headY = 124 * s;
+
+  ctx.font = `900 ${Math.round(26 * s)}px "Outfit", sans-serif`;
+  wrapTextDualColor(ctx, yellowPart, whitePart, headStartX, headY, headMaxW, headLineH, 3);
+  ctx.shadowColor = 'transparent';
+
+  // 5. Center Framed Video Viewport (16:9 widescreen window)
+  const vX = 28 * s;
+  const vY = 270 * s;
+  const vW = w - 56 * s;
+  const vH = 390 * s;
+  const vRadius = 14 * s;
+
+  if (!overlayOnly) {
+    if (hasVideo) {
+      ctx.save();
+      roundRect(ctx, vX, vY, vW, vH, vRadius);
+      ctx.clip();
+      drawImageProp(ctx, vid, vX, vY, vW, vH, 0.5, 0.5);
+      if (reelState.darken > 0) {
+        ctx.fillStyle = `rgba(0, 0, 0, ${reelState.darken / 100})`;
+        ctx.fillRect(vX, vY, vW, vH);
+      }
+      ctx.restore();
+    } else {
+      drawVideoPlaceholder(ctx, vX, vY, vW, vH);
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.15)';
+      ctx.beginPath();
+      ctx.arc(vX + vW / 2, vY + vH / 2 - 14 * s, 34 * s, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath();
+      ctx.moveTo(vX + vW / 2 - 10 * s, vY + vH / 2 - 28 * s);
+      ctx.lineTo(vX + vW / 2 + 16 * s, vY + vH / 2 - 14 * s);
+      ctx.lineTo(vX + vW / 2 - 10 * s, vY + vH / 2);
+      ctx.closePath();
+      ctx.fill();
+
+      ctx.font = `bold ${Math.round(15 * s)}px "Outfit", sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+      ctx.fillText('YOUR VIDEO HERE', vX + vW / 2, vY + vH / 2 + 40 * s);
+    }
+  } else {
+    // Transparent hole for underlying video composite
+    ctx.clearRect(vX, vY, vW, vH);
+  }
+
+  // Glowing Crimson/Neon Border around video
+  ctx.save();
+  ctx.strokeStyle = '#ef4444';
+  ctx.lineWidth = 3.5 * s;
+  ctx.shadowColor = 'rgba(239, 68, 68, 0.9)';
+  ctx.shadowBlur = 18 * s;
+  roundRect(ctx, vX, vY, vW, vH, vRadius);
+  ctx.stroke();
+  ctx.restore();
+
+  // Location / Topic Tag on Top-Left of Video Viewport
+  const locTagW = Math.min(260 * s, Math.max(140 * s, locText.length * 9 * s + 48 * s));
+  ctx.fillStyle = '#dc2626';
+  roundRect(ctx, vX + 14 * s, vY + 14 * s, locTagW, 30 * s, 15 * s);
+  ctx.fill();
+
+  ctx.fillStyle = '#ffffff';
+  ctx.font = `bold ${Math.round(13 * s)}px "Plus Jakarta Sans", sans-serif`;
+  ctx.textAlign = 'left';
+  ctx.fillText(`📍 ${locText.slice(0, 24)}`, vX + 26 * s, vY + 34 * s);
+
+  // 6. Middle Category & Sub-hook Bar
+  const midY = 675 * s;
+  const midH = 65 * s;
+
+  // Left Topic Badge
+  const catBadgeW = 180 * s;
+  const catGrad = ctx.createLinearGradient(vX, midY, vX + catBadgeW, midY + midH);
+  catGrad.addColorStop(0, '#dc2626');
+  catGrad.addColorStop(1, '#991b1b');
+  ctx.fillStyle = catGrad;
+  roundRect(ctx, vX, midY, catBadgeW, midH, 10 * s);
+  ctx.fill();
+
+  ctx.fillStyle = '#ffffff';
+  ctx.font = `900 ${Math.round(16 * s)}px "Outfit", sans-serif`;
+  ctx.textAlign = 'left';
+  const catWords = catText.split(/\s+/);
+  if (catWords.length >= 2) {
+    ctx.fillText(`🌐 ${catWords[0].slice(0, 10)}`, vX + 16 * s, midY + 27 * s);
+    ctx.fillText(`${catWords.slice(1).join(' ').slice(0, 12)}`, vX + 42 * s, midY + 49 * s);
+  } else {
+    ctx.fillText(`🌐 ${catText.slice(0, 14)}`, vX + 16 * s, midY + 39 * s);
+  }
+
+  // Right High-Contrast Summary Card
+  const subCardX = vX + catBadgeW + 10 * s;
+  const subCardW = w - subCardX - 28 * s;
+  ctx.fillStyle = '#ffffff';
+  roundRect(ctx, subCardX, midY, subCardW, midH, 10 * s);
+  ctx.fill();
+
+  ctx.fillStyle = '#0f172a';
+  ctx.font = `italic 800 ${Math.round(16 * s)}px "Outfit", sans-serif`;
+  ctx.textAlign = 'left';
+  const shortSubHook = descText.split(/[.?!]/)[0].trim() || 'Key developments unfolding rapidly';
+  wrapText(ctx, shortSubHook, subCardX + 16 * s, midY + 28 * s, subCardW - 32 * s, 20 * s, 2);
+
+  // 7. Lower Section - KEY HIGHLIGHTS & Mascot/Photo
+  const hlY = 752 * s;
+  const hlH = 300 * s;
+  const hlW = (w - 56 * s) * 0.64;
+
+  // Highlights Card Container
+  ctx.fillStyle = 'rgba(15, 23, 42, 0.94)';
+  roundRect(ctx, vX, hlY, hlW, hlH, 14 * s);
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(239, 68, 68, 0.4)';
+  ctx.lineWidth = 1.5 * s;
+  ctx.stroke();
+
+  // "KEY HIGHLIGHTS >>" Badge
+  ctx.fillStyle = '#dc2626';
+  roundRect(ctx, vX + 14 * s, hlY + 12 * s, 175 * s, 28 * s, 14 * s);
+  ctx.fill();
+
+  ctx.fillStyle = '#ffffff';
+  ctx.font = `900 ${Math.round(13 * s)}px "Outfit", sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.fillText('KEY HIGHLIGHTS >>', vX + 101 * s, hlY + 31 * s);
+
+  // 3 Dynamic Bullet Points
+  const bulletStartY = hlY + 68 * s;
+  const bulletSpacing = 72 * s;
+  highlights.slice(0, 3).forEach((bullet, bIdx) => {
+    const curBY = bulletStartY + bIdx * bulletSpacing;
+
+    // Glowing Yellow Checkmark Icon
+    ctx.fillStyle = '#facc15';
+    ctx.font = `900 ${Math.round(18 * s)}px "Outfit", sans-serif`;
+    ctx.textAlign = 'left';
+    ctx.fillText('✔', vX + 16 * s, curBY + 10 * s);
+
+    // Bullet Text (clean white text, bold)
+    ctx.fillStyle = '#f8fafc';
+    ctx.font = `600 ${Math.round(15 * s)}px "Plus Jakarta Sans", sans-serif`;
+    wrapText(ctx, bullet, vX + 42 * s, curBY, hlW - 54 * s, 21 * s, 2);
+  });
+
+  // Right Side Mascot / News Thumbnail Card
+  const mascotX = vX + hlW + 12 * s;
+  const mascotW = w - mascotX - 28 * s;
+  const mascotH = hlH;
+
+  ctx.fillStyle = 'rgba(15, 23, 42, 0.94)';
+  roundRect(ctx, mascotX, hlY, mascotW, mascotH, 14 * s);
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(239, 68, 68, 0.4)';
+  ctx.lineWidth = 1.5 * s;
+  ctx.stroke();
+
+  // If article image exists and is loaded: draw image; else draw cool sunglasses meme mascot
+  const artImg = state.currentPhotoImg;
+  if (artImg && artImg.complete && artImg.naturalWidth > 0 && !overlayOnly) {
+    ctx.save();
+    roundRect(ctx, mascotX + 8 * s, hlY + 8 * s, mascotW - 16 * s, mascotH - 16 * s, 10 * s);
+    ctx.clip();
+    drawImageProp(ctx, artImg, mascotX + 8 * s, hlY + 8 * s, mascotW - 16 * s, mascotH - 16 * s, 0.5, 0.5);
+    ctx.restore();
+  } else {
+    drawViralMascotBadge(ctx, mascotX, hlY, mascotW, mascotH, s);
+  }
+
+  // 8. Large Slanted Punchline
+  const punchY = 1085 * s;
+  ctx.save();
+  ctx.shadowColor = 'rgba(0, 0, 0, 0.95)';
+  ctx.shadowBlur = 12 * s;
+  ctx.textAlign = 'center';
+  ctx.font = `italic 900 ${Math.round(27 * s)}px "Outfit", sans-serif`;
+
+  const pGrad = ctx.createLinearGradient(40 * s, punchY, w - 40 * s, punchY);
+  pGrad.addColorStop(0, '#ffffff');
+  pGrad.addColorStop(0.5, '#fde047');
+  pGrad.addColorStop(1, '#facc15');
+  ctx.fillStyle = pGrad;
+  wrapText(ctx, punchlineText, w / 2, punchY, w - 60 * s, 34 * s, 2);
+  ctx.restore();
+
+  // 9. Bottom Footer Bar (Divider Line & Hashtags)
+  const footY = h - 60 * s;
+  ctx.fillStyle = '#dc2626';
+  ctx.fillRect(0, footY, w, 2.5 * s);
+
+  ctx.fillStyle = '#070b15';
+  ctx.fillRect(0, footY + 2.5 * s, w, 58 * s);
+
+  ctx.fillStyle = '#94a3b8';
+  ctx.font = `bold ${Math.round(13 * s)}px "Plus Jakarta Sans", sans-serif`;
+  ctx.textAlign = 'left';
+  ctx.fillText('🌐 Stay Tuned for More Updates...', 28 * s, footY + 36 * s);
+
+  // Dynamic tags
+  const tagsText = `#${catText.replace(/\s+/g, '')} #BreakingNews #Trending`;
+  ctx.fillStyle = '#facc15';
+  ctx.font = `bold ${Math.round(13 * s)}px "Plus Jakarta Sans", sans-serif`;
+  ctx.textAlign = 'right';
+  ctx.fillText(tagsText, w - 28 * s, footY + 36 * s);
+}
+
 /* Layout 8: Split-Screen News Card */
 function drawReelSplitLayout(targetCtx, w, h, vid, hasVideo, topHook, caption, publisher, overlayOnly = false) {
   const ctx = targetCtx || reelCtx;
@@ -4215,10 +4742,13 @@ function drawReelSavageRealityLayout(targetCtx, w, h, vid, hasVideo, topHook, ca
   wrapText(ctx, caption, w / 2, bY + 62 * s, w - 90 * s, 28 * s);
 }
 
-function renderSelectedLayout(ctx, w, h, vid, hasVideo, topHook, caption, publisher, overlayOnly = false, layoutOverride = null) {
+function renderSelectedLayout(ctx, w, h, vid, hasVideo, topHook, caption, publisher, overlayOnly = false, layoutOverride = null, customData = null) {
   try {
   const activeLayout = layoutOverride || reelState.layout;
   switch (activeLayout) {
+    case 'reel_broadcast_highlights':
+      drawReelBroadcastHighlightsLayout(ctx, w, h, vid, hasVideo, topHook, caption, publisher, overlayOnly, customData);
+      break;
     case 'reel_split':
       drawReelSplitLayout(ctx, w, h, vid, hasVideo, topHook, caption, publisher, overlayOnly);
       break;
@@ -4336,7 +4866,7 @@ function getReelOverlayDataUrl(customData = null) {
   const publisher = customData?.publisher || state.selectedArticle?.publisher || 'TODAY MEMER';
   const layout = customData?.layout || reelState.layout;
 
-  renderSelectedLayout(ctx, w, h, null, false, topHook, caption, publisher, true, layout);
+  renderSelectedLayout(ctx, w, h, null, false, topHook, caption, publisher, true, layout, customData);
   return offCanvas.toDataURL('image/png');
 }
 
@@ -4371,7 +4901,7 @@ async function exportReelVideo() {
         quality_enhancement: reelState.qualityEnhance !== false,
         overlay: overlay,
         layout: reelState.layout,
-        duration: reelState.duration || 12,
+        duration: reelState.duration || 20,
         quality: reelState.quality || 'hd1080',
         color_grade: reelState.colorGrade || 'none'
       })
@@ -4906,7 +5436,7 @@ async function openPublishModalForReel() {
             video_name: videoName,
             overlay: overlay,
             layout: reelState.layout,
-            duration: 12
+            duration: reelState.duration || 20
           })
         });
         const data = await res.json();
@@ -5008,7 +5538,7 @@ async function executeInstagramPublish() {
             video_name: videoName,
             overlay: overlay,
             layout: reelState.layout,
-            duration: reelState.duration || 12,
+            duration: reelState.duration || 20,
             quality: reelState.quality || 'hd1080',
             color_grade: reelState.colorGrade || 'none'
           })
@@ -5083,6 +5613,7 @@ async function executeInstagramPublish() {
    BATCH REEL STUDIO & 1-CLICK INSTAGRAM AUTO-POST WORKFLOW
    ========================================================================== */
 const BATCH_PATTERNS = [
+  'reel_broadcast_highlights',
   'reel_split',
   'reel_chyron',
   'reel_unusual_whales',
@@ -5114,6 +5645,7 @@ const batchState = {
 
 function formatPatternName(layout) {
   const map = {
+    'reel_broadcast_highlights': '🔴 Viral Breaking Highlights',
     'reel_split': 'Split Breaking News',
     'reel_chyron': 'Live TV Chyron',
     'reel_unusual_whales': 'Unusual Whales Alert',
@@ -5133,7 +5665,7 @@ function formatPatternName(layout) {
     'reel_before_after': 'Expectation vs Reality',
     'reel_impact': 'Impact Meme Classic'
   };
-  return map[layout] || 'Split Breaking News';
+  return map[layout] || '🔴 Viral Breaking Highlights';
 }
 
 function extractSearchKeywords(title) {
@@ -5457,6 +5989,7 @@ async function startBatchWorkflow() {
   const autoPostIg = elements.batchAutoPostIgToggle ? elements.batchAutoPostIgToggle.checked : true;
   const postDelaySec = parseInt(elements.batchPostDelaySelect?.value || '10', 10);
   const speedQuality = document.getElementById('batchSpeedSelect')?.value || 'fast_720';
+  const batchDuration = parseInt(document.getElementById('batchDurationSelect')?.value || '20', 10);
 
   showToast('⚡ Pre-rendering overlays & starting Termux background worker...', 'info');
 
@@ -5484,6 +6017,7 @@ async function startBatchWorkflow() {
       publisher: art.publisher || '',
       category: state.currentTopic || '',
       pattern: pattern,
+      duration: batchDuration,
       manualUrl: art.manualVideoUrl || (isManualSource ? globalManualUrl : ''),
       overlay: overlayPng,
       overlayData: overlayPng,
@@ -5516,7 +6050,8 @@ async function startBatchWorkflow() {
         items: preparedItems,
         auto_post_ig: autoPostIg,
         post_delay_sec: postDelaySec,
-        quality: speedQuality
+        quality: speedQuality,
+        duration: batchDuration
       })
     });
     const data = await res.json();

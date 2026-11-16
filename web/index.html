@@ -562,9 +562,9 @@
               </button>
             </div>
 
-            <!-- Category filter pills for 20 patterns -->
+            <!-- Category filter pills for 21 patterns -->
             <div class="pattern-category-tabs" id="patternCategoryTabs">
-              <button type="button" class="pcat-btn active" data-cat="all">🔥 All (20)</button>
+              <button type="button" class="pcat-btn active" data-cat="all">🔥 All (21)</button>
               <button type="button" class="pcat-btn" data-cat="news">📰 News & TV</button>
               <button type="button" class="pcat-btn" data-cat="meme">💀 Dark Memes</button>
               <button type="button" class="pcat-btn" data-cat="reddit">🤖 Reddit Stories</button>
@@ -573,8 +573,15 @@
             </div>
 
             <div class="photo-layout-grid pattern-grid-20" id="reelLayoutGrid">
-              <!-- 1. Split-Screen Breaking News Card (Default) -->
-              <button class="layout-btn active" data-reellayout="reel_split" data-cat="news" title="Top White News Card + Video Below">
+              <!-- 1. Breaking News & Highlights Broadcast (Featured #1 Top Template) -->
+              <button class="layout-btn active" data-reellayout="reel_broadcast_highlights" data-cat="news" title="🔴 Viral Breaking Highlights: 3D Ribbon + Framed Viewport + Key Highlights + Punchline">
+                <span class="layout-btn-icon">🚨</span>
+                <span class="layout-btn-title">Breaking Highlights</span>
+                <span class="layout-btn-sub">🔴 3D Viral Broadcast</span>
+              </button>
+
+              <!-- 2. Split-Screen Breaking News Card -->
+              <button class="layout-btn" data-reellayout="reel_split" data-cat="news" title="Top White News Card + Video Below">
                 <span class="layout-btn-icon">📰</span>
                 <span class="layout-btn-title">Split News Card</span>
                 <span class="layout-btn-sub">Top White Card</span>
@@ -753,13 +760,14 @@
               </div>
             </div>
             <div class="duration-control-row" style="margin-top: 10px;">
-              <label for="reelDurationSelect" class="mini-label">Reel Length:</label>
-              <select id="reelDurationSelect" class="styled-select" style="max-width: 150px;">
-                <option value="6">6 Seconds (Fast Loop)</option>
-                <option value="10">10 Seconds (Standard)</option>
-                <option value="12" selected>12 Seconds (Optimal)</option>
+              <label for="reelDurationSelect" class="mini-label">⏱️ Reel Length:</label>
+              <select id="reelDurationSelect" class="styled-select" style="max-width: 170px;">
+                <option value="10">10 Seconds (Quick)</option>
                 <option value="15">15 Seconds (Story)</option>
-                <option value="20">20 Seconds (Extended)</option>
+                <option value="20" selected>20 Seconds (Viral Optimal)</option>
+                <option value="30">30 Seconds (In-Depth News)</option>
+                <option value="45">45 Seconds (Detailed)</option>
+                <option value="60">60 Seconds (Full Breakdown)</option>
               </select>
             </div>
           </div>
@@ -1099,8 +1107,9 @@
               <div class="pattern-strategy-select-wrap">
                 <label for="batchPatternStrategy" class="control-label">Pattern Strategy:</label>
                 <select id="batchPatternStrategy" class="styled-select batch-select">
-                  <option value="cycle" selected>🔄 Cycle All 20+ Viral Patterns (Split News, TV Chyron, Dark Meme, Glitch, Tweet Dark, etc.)</option>
+                  <option value="cycle" selected>🔄 Cycle All 21+ Viral Patterns (Breaking Highlights, Split News, TV Chyron, Dark Meme, Glitch, etc.)</option>
                   <option value="random">🎲 Randomize Viral Patterns</option>
+                  <option value="reel_broadcast_highlights">🚨 Breaking Highlights (🔴 3D Broadcast + Dynamic Bullets)</option>
                   <option value="reel_split">📰 Split-Screen Breaking News Card</option>
                   <option value="reel_chyron">🔴 Live Broadcast TV Chyron & Ticker</option>
                   <option value="reel_dark_humor">💀 Existential Dark Meme</option>
@@ -1172,6 +1181,18 @@
                 <select id="batchSpeedSelect" class="styled-select batch-select-small">
                   <option value="fast_720" selected>⚡ Ultra-Fast Upload (720x1280 @ 3Mbps - 5x Faster on Mobile/Termux)</option>
                   <option value="hd1080">💎 Full HD Master (1080x1920 @ 4.2Mbps)</option>
+                </select>
+              </div>
+
+              <!-- Reel Video Length Duration Selector -->
+              <div class="post-delay-row" id="batchDurationRow" style="margin-top: 10px;">
+                <label for="batchDurationSelect" class="control-label">⏱️ Reel Video Length (Duration):</label>
+                <select id="batchDurationSelect" class="styled-select batch-select-small">
+                  <option value="15">15 Seconds (Story)</option>
+                  <option value="20" selected>20 Seconds (Viral Recommended)</option>
+                  <option value="30">30 Seconds (In-Depth News)</option>
+                  <option value="45">45 Seconds (Detailed Broadcast)</option>
+                  <option value="60">60 Seconds (Full Breakdown)</option>
                 </select>
               </div>
 
