@@ -5910,6 +5910,18 @@ function renderSelectedLayout(ctx, w, h, vid, hasVideo, topHook, caption, publis
     case 'reel_broadcast_highlights':
       drawReelBroadcastHighlightsLayout(ctx, w, h, vid, hasVideo, topHook, caption, publisher, overlayOnly, customData);
       break;
+    case 'reel_tom_doge_newspaper':
+      drawReelTomDogeNewspaperLayout(ctx, w, h, vid, hasVideo, topHook, caption, publisher, overlayOnly, customData);
+      break;
+    case 'reel_anchor_cat_buzz':
+      drawReelAnchorCatBuzzLayout(ctx, w, h, vid, hasVideo, topHook, caption, publisher, overlayOnly, customData);
+      break;
+    case 'reel_satire_anchor_desk':
+      drawReelSatireAnchorDeskLayout(ctx, w, h, vid, hasVideo, topHook, caption, publisher, overlayOnly, customData);
+      break;
+    case 'reel_global_diplomacy':
+      drawReelGlobalDiplomacyLayout(ctx, w, h, vid, hasVideo, topHook, caption, publisher, overlayOnly, customData);
+      break;
     case 'reel_split':
       drawReelSplitLayout(ctx, w, h, vid, hasVideo, topHook, caption, publisher, overlayOnly);
       break;
@@ -5971,13 +5983,13 @@ function renderSelectedLayout(ctx, w, h, vid, hasVideo, topHook, caption, publis
       drawReelNeonCyberpunkLayout(ctx, w, h, vid, hasVideo, topHook, caption, publisher, overlayOnly);
       break;
     default:
-      drawReelSplitLayout(ctx, w, h, vid, hasVideo, topHook, caption, publisher, overlayOnly);
+      drawReelBroadcastHighlightsLayout(ctx, w, h, vid, hasVideo, topHook, caption, publisher, overlayOnly, customData);
       break;
   }
   } catch (err) {
     console.warn('[REEL RENDER] Handled layout error gracefully:', err);
     try {
-      drawReelSplitLayout(ctx, w, h, vid, hasVideo, topHook, caption, publisher, overlayOnly);
+      drawReelBroadcastHighlightsLayout(ctx, w, h, vid, hasVideo, topHook, caption, publisher, overlayOnly, customData);
     } catch (e2) {}
   }
 }
@@ -6778,25 +6790,7 @@ const BATCH_PATTERNS = [
   'reel_tom_doge_newspaper',
   'reel_anchor_cat_buzz',
   'reel_satire_anchor_desk',
-  'reel_global_diplomacy',
-  'reel_split',
-  'reel_chyron',
-  'reel_unusual_whales',
-  'reel_dark_humor',
-  'reel_fake_notification',
-  'reel_tweet_dark',
-  'reel_simulation_glitch',
-  'reel_reddit_story',
-  'reel_savage_reality',
-  'reel_headline_reaction',
-  'reel_retro_vhs',
-  'reel_neon_cyberpunk',
-  'reel_reddit_confession',
-  'reel_reddit_aita',
-  'reel_brainrot_subway',
-  'reel_podcast_clip',
-  'reel_before_after',
-  'reel_impact'
+  'reel_global_diplomacy'
 ];
 
 const batchState = {
@@ -7158,6 +7152,7 @@ async function startBatchWorkflow() {
   const autoPostIg = elements.batchAutoPostIgToggle ? elements.batchAutoPostIgToggle.checked : true;
   const postDelaySec = parseInt(elements.batchPostDelaySelect?.value || '10', 10);
   const speedQuality = document.getElementById('batchSpeedSelect')?.value || 'fast_720';
+  const batchDuration = parseInt(document.getElementById('batchDurationSelect')?.value || '20', 10);
 
   showToast('⚡ Pre-rendering overlays & starting Termux background worker...', 'info');
 
@@ -7185,6 +7180,7 @@ async function startBatchWorkflow() {
       publisher: art.publisher || '',
       category: state.currentTopic || '',
       pattern: pattern,
+      duration: batchDuration,
       manualUrl: art.manualVideoUrl || (isManualSource ? globalManualUrl : ''),
       overlay: overlayPng,
       overlayData: overlayPng,
@@ -7217,7 +7213,8 @@ async function startBatchWorkflow() {
         items: preparedItems,
         auto_post_ig: autoPostIg,
         post_delay_sec: postDelaySec,
-        quality: speedQuality
+        quality: speedQuality,
+        duration: batchDuration
       })
     });
     const data = await res.json();
