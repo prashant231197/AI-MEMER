@@ -7449,5 +7449,278 @@ window.closeBatchReelModal = closeBatchReelModal;
 window.startBatchWorkflow = startBatchWorkflow;
 window.stopBatchWorkflow = stopBatchWorkflow;
 
+/* ============================================================== */
+/* AI REEL-TO-ANIME MEME STUDIO CLIENT MODULE                     */
+/* ============================================================== */
+let currentAnimeSourceMode = 'preset';
+let currentAnimeStyle = 'hayao';
+let currentAnimeMode = 'prequel_reveal';
+let currentUploadedVideoBase64 = null;
+let activeAnimeJobId = null;
+let activeAnimePollInterval = null;
+let latestRenderedAnimeFilename = null;
+
+function openAnimeStudioModal() {
+  const modal = document.getElementById('animeStudioModal');
+  if (modal) {
+    modal.style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+  }
+}
+
+function closeAnimeStudioModal() {
+  const modal = document.getElementById('animeStudioModal');
+  if (modal) {
+    modal.style.display = 'none';
+    document.body.style.overflow = '';
+  }
+  if (activeAnimePollInterval) {
+    clearInterval(activeAnimePollInterval);
+    activeAnimePollInterval = null;
+  }
+}
+
+function setAnimeSourceMode(mode) {
+  currentAnimeSourceMode = mode;
+  ['pillPreset', 'pillUrl', 'pillUpload'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.classList.remove('active');
+  });
+
+  const activeBtn = mode === 'preset' ? 'pillPreset' : (mode === 'url' ? 'pillUrl' : 'pillUpload');
+  const btnEl = document.getElementById(activeBtn);
+  if (btnEl) btnEl.classList.add('active');
+
+  const presetGrp = document.getElementById('animePresetGroup');
+  const urlGrp = document.getElementById('animeUrlGroup');
+  const uploadGrp = document.getElementById('animeUploadGroup');
+
+  if (presetGrp) presetGrp.style.display = mode === 'preset' ? 'block' : 'none';
+  if (urlGrp) urlGrp.style.display = mode === 'url' ? 'block' : 'none';
+  if (uploadGrp) uploadGrp.style.display = mode === 'upload' ? 'block' : 'none';
+}
+
+function selectAnimeStyle(styleId) {
+  currentAnimeStyle = styleId;
+  const cards = {
+    'hayao': 'styleCardHayao',
+    'face_paint': 'styleCardFacePaint',
+    'hf_animegan': 'styleCardHF',
+    'comic_cel': 'styleCardCel'
+  };
+  Object.values(cards).forEach(cid => {
+    const el = document.getElementById(cid);
+    if (el) el.classList.remove('active');
+  });
+  const activeEl = document.getElementById(cards[styleId]);
+  if (activeEl) activeEl.classList.add('active');
+}
+
+function setAnimeStoryMode(modeVal) {
+  currentAnimeMode = modeVal;
+  const boxP = document.getElementById('modeBoxPrequel');
+  const boxF = document.getElementById('modeBoxFull');
+  if (boxP) boxP.classList.toggle('active', modeVal === 'prequel_reveal');
+  if (boxF) boxF.classList.toggle('active', modeVal === 'full_anime');
+}
+
+function handleAnimeFileSelected(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+
+  const statusEl = document.getElementById('animeUploadStatus');
+  if (statusEl) statusEl.textContent = `Selected: ${file.name} (${(file.size / (1024*1024)).toFixed(1)} MB)`;
+
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    currentUploadedVideoBase64 = e.target.result;
+    showToast(`Video loaded: ${file.name}`, 'info');
+  };
+  reader.readAsDataURL(file);
+}
+
+async function startAnimeGeneration() {
+  const startBtn = document.getElementById('startAnimeBtn');
+  const progressBox = document.getElementById('animeProgressBox');
+  const progressBar = document.getElementById('animeProgressBar');
+  const progressMsg = document.getElementById('animeProgressMsg');
+  const progressPct = document.getElementById('animeProgressPct');
+  const statusBadge = document.getElementById('animeStatusBadge');
+  const videoPlayer = document.getElementById('animeVideoPlayer');
+  const placeholder = document.getElementById('animePlaceholder');
+  const resultActions = document.getElementById('animeResultActions');
+
+  const topTitle = document.getElementById('animeTopTitle') ? document.getElementById('animeTopTitle').value.trim() : 'BIHARI AURA 💀🔥';
+  const subTitle = document.getElementById('animeSubTitle') ? document.getElementById('animeSubTitle').value.trim() : 'Wait For The Real Ending! 😂💸';
+
+  const payload = {
+    title: topTitle,
+    subtitle: subTitle,
+    style: currentAnimeStyle,
+    mode: currentAnimeMode,
+    anime_duration: 4.5
+  };
+
+  if (currentAnimeSourceMode === 'preset') {
+    payload.video_name = 'sample_real_reel.mp4';
+  } else if (currentAnimeSourceMode === 'url') {
+    const url = document.getElementById('animeReelUrl') ? document.getElementById('animeReelUrl').value.trim() : '';
+    if (!url) {
+      showToast('Kripya Instagram Reel ya Video URL daalein!', 'warning');
+      return;
+    }
+    payload.url = url;
+  } else if (currentAnimeSourceMode === 'upload') {
+    if (!currentUploadedVideoBase64) {
+      showToast('Kripya pehle video file select karein!', 'warning');
+      return;
+    }
+    payload.video_base64 = currentUploadedVideoBase64;
+  }
+
+  // Update UI
+  if (startBtn) {
+    startBtn.disabled = true;
+    startBtn.innerHTML = '<span>⏳ Processing Animation...</span>';
+  }
+  if (progressBox) progressBox.style.display = 'block';
+  if (resultActions) resultActions.style.display = 'none';
+  if (progressBar) progressBar.style.width = '5%';
+  if (progressMsg) progressMsg.textContent = 'Submitting video to AI engine...';
+  if (progressPct) progressPct.textContent = '5%';
+  if (statusBadge) {
+    statusBadge.textContent = 'Processing';
+    statusBadge.className = 'status-badge running';
+    statusBadge.style.background = '#ff0844';
+    statusBadge.style.color = '#fff';
+  }
+
+  try {
+    const res = await fetch('/api/animate-reel', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json();
+
+    if (!data.success || !data.job_id) {
+      throw new Error(data.error || 'Failed to submit animation job');
+    }
+
+    activeAnimeJobId = data.job_id;
+    showToast('AI Anime Reel generation started!', 'success');
+    pollAnimeJobProgress(activeAnimeJobId);
+
+  } catch (err) {
+    console.error('[Anime Gen Error]', err);
+    showToast(`Error: ${err.message}`, 'error');
+    if (startBtn) {
+      startBtn.disabled = false;
+      startBtn.innerHTML = '<span>🔥 Generate Animated Reel (रील बनाओ)</span>';
+    }
+    if (statusBadge) {
+      statusBadge.textContent = 'Failed';
+      statusBadge.style.background = '#dc3545';
+    }
+  }
+}
+
+function pollAnimeJobProgress(jobId) {
+  if (activeAnimePollInterval) clearInterval(activeAnimePollInterval);
+
+  activeAnimePollInterval = setInterval(async () => {
+    try {
+      const res = await fetch(`/api/animate-reel-status?job_id=${encodeURIComponent(jobId)}`);
+      if (!res.ok) return;
+      const statusData = await res.json();
+
+      const progressBar = document.getElementById('animeProgressBar');
+      const progressMsg = document.getElementById('animeProgressMsg');
+      const progressPct = document.getElementById('animeProgressPct');
+      const statusBadge = document.getElementById('animeStatusBadge');
+      const startBtn = document.getElementById('startAnimeBtn');
+      const videoPlayer = document.getElementById('animeVideoPlayer');
+      const placeholder = document.getElementById('animePlaceholder');
+      const resultActions = document.getElementById('animeResultActions');
+      const downloadLink = document.getElementById('animeDownloadLink');
+
+      if (progressBar && statusData.progress) progressBar.style.width = `${statusData.progress}%`;
+      if (progressPct && statusData.progress) progressPct.textContent = `${statusData.progress}%`;
+      if (progressMsg && statusData.step) progressMsg.textContent = statusData.step;
+
+      if (statusData.status === 'completed') {
+        clearInterval(activeAnimePollInterval);
+        activeAnimePollInterval = null;
+
+        if (statusBadge) {
+          statusBadge.textContent = 'Complete 🎉';
+          statusBadge.style.background = '#28a745';
+        }
+        if (startBtn) {
+          startBtn.disabled = false;
+          startBtn.innerHTML = '<span>🔥 Generate Another Reel</span>';
+        }
+
+        latestRenderedAnimeFilename = statusData.filename;
+
+        // Show Video Preview
+        if (videoPlayer && statusData.videoUrl) {
+          videoPlayer.src = statusData.videoUrl;
+          videoPlayer.style.display = 'block';
+          if (placeholder) placeholder.style.display = 'none';
+          videoPlayer.play().catch(() => {});
+        }
+
+        // Show Download Actions
+        if (resultActions) resultActions.style.display = 'flex';
+        if (downloadLink && statusData.videoUrl) {
+          downloadLink.href = statusData.videoUrl;
+          downloadLink.download = statusData.filename || 'viral_anime_reel.mp4';
+        }
+
+        showToast('🎉 Animated Reel rendered successfully!', 'success');
+      } else if (statusData.status === 'failed') {
+        clearInterval(activeAnimePollInterval);
+        activeAnimePollInterval = null;
+
+        if (statusBadge) {
+          statusBadge.textContent = 'Failed';
+          statusBadge.style.background = '#dc3545';
+        }
+        if (startBtn) {
+          startBtn.disabled = false;
+          startBtn.innerHTML = '<span>🔥 Retry Generate Reel</span>';
+        }
+        showToast(`Animation failed: ${statusData.error || 'Unknown error'}`, 'error');
+      }
+    } catch (err) {
+      console.warn('[Poll Error]', err);
+    }
+  }, 1500);
+}
+
+function publishAnimeReelToInstagram() {
+  if (!latestRenderedAnimeFilename) {
+    showToast('Pehle video render hone dein!', 'warning');
+    return;
+  }
+  // Reuse existing Instagram Reel publisher modal
+  if (typeof openPublishModalForReel === 'function') {
+    closeAnimeStudioModal();
+    openPublishModalForReel(latestRenderedAnimeFilename, 'AI Animated Viral Meme Reel 💀🔥 #ViralReel #AIAnime');
+  } else {
+    showToast('Instagram direct publisher opening...', 'info');
+  }
+}
+
+window.openAnimeStudioModal = openAnimeStudioModal;
+window.closeAnimeStudioModal = closeAnimeStudioModal;
+window.setAnimeSourceMode = setAnimeSourceMode;
+window.selectAnimeStyle = selectAnimeStyle;
+window.setAnimeStoryMode = setAnimeStoryMode;
+window.handleAnimeFileSelected = handleAnimeFileSelected;
+window.startAnimeGeneration = startAnimeGeneration;
+window.publishAnimeReelToInstagram = publishAnimeReelToInstagram;
+
 // Start application
 window.addEventListener('DOMContentLoaded', init);

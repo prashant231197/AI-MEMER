@@ -58,6 +58,11 @@
           <span>Reel Maker Studio</span>
         </button>
 
+        <button id="openAnimeStudioNavBtn" class="sparkle-btn anime-nav-btn" onclick="openAnimeStudioModal()" title="Convert Reel to Viral Anime Meme" style="background: linear-gradient(135deg, #ff0844 0%, #ffb199 100%); border: 1px solid #ff758c; box-shadow: 0 0 15px rgba(255, 8, 68, 0.45);">
+          <span class="btn-icon">🎨</span>
+          <span>Reel to Anime Studio</span>
+        </button>
+
         <button id="openInstagramModalBtn" class="ig-nav-btn" onclick="openInstagramModal()" title="Connect Instagram Account">
           <span class="ig-nav-icon">📸</span>
           <span id="igNavLabel">Connect Instagram</span>
@@ -1364,6 +1369,171 @@
     </div>
   </div>
 
+  <!-- ============================================================ -->
+  <!-- MODAL: AI Reel-to-Anime Studio (रील से वायरल एनीमेशन बनाएं) -->
+  <!-- ============================================================ -->
+  <div class="modal-overlay" id="animeStudioModal" style="display: none;">
+    <div class="modal-box modal-xl anime-studio-box">
+      <div class="modal-header anime-header">
+        <div class="modal-title-group">
+          <div class="modal-badge-row">
+            <span class="studio-badge" style="background: #ff0844; color: #fff; padding: 3px 8px; border-radius: 4px; font-size: 11px; font-weight: 700;">🔥 VIRAL MEME FORMULA</span>
+            <span class="studio-badge" style="background: #6a11cb; color: #fff; padding: 3px 8px; border-radius: 4px; font-size: 11px; font-weight: 700;">⚡ 100% LOCAL & CLOUD AI</span>
+          </div>
+          <h2 class="modal-title" style="margin-top: 6px;">🎨 AI Reel-to-Anime Meme Studio</h2>
+          <p class="modal-subtitle" style="color: #bbb; font-size: 13px;">Instagram Reel ko viral Anime/Comic Story me badlo (Anime Prequel + Beat Drop + Real Climax Reveal)!</p>
+        </div>
+        <button class="close-modal-btn" onclick="closeAnimeStudioModal()" title="Close">&times;</button>
+      </div>
+
+      <div class="modal-body anime-studio-body" style="padding: 20px;">
+        <div class="anime-studio-grid">
+          <!-- LEFT COLUMN: Settings & Input -->
+          <div class="anime-left-panel">
+            <!-- Source Selection -->
+            <div class="form-section" style="margin-bottom: 18px;">
+              <label class="section-label" style="display: block; font-weight: 700; margin-bottom: 8px; color: #ffd700;">1. Choose Reel Source</label>
+              <div class="source-pills">
+                <button type="button" class="source-pill active" id="pillPreset" onclick="setAnimeSourceMode('preset')">🌟 Bihari Aura Sample</button>
+                <button type="button" class="source-pill" id="pillUrl" onclick="setAnimeSourceMode('url')">🔗 Reel / Shorts URL</button>
+                <button type="button" class="source-pill" id="pillUpload" onclick="setAnimeSourceMode('upload')">📁 Upload MP4 Video</button>
+              </div>
+
+              <!-- URL Input Box -->
+              <div id="animeUrlGroup" class="input-subgroup" style="display: none; margin-top: 10px;">
+                <input type="text" id="animeReelUrl" class="styled-input" style="width: 100%; padding: 10px; border-radius: 8px; background: rgba(0,0,0,0.4); border: 1px solid #444; color: #fff;" placeholder="Paste Instagram Reel or YouTube Shorts URL..." />
+              </div>
+
+              <!-- Upload Input Box -->
+              <div id="animeUploadGroup" class="input-subgroup" style="display: none; margin-top: 10px;">
+                <input type="file" id="animeVideoFileInput" accept="video/mp4,video/*" class="styled-file-input" onchange="handleAnimeFileSelected(event)" />
+                <span id="animeUploadStatus" class="upload-hint" style="display: block; margin-top: 6px; font-size: 12px; color: #aaa;">Upload any video from your device</span>
+              </div>
+
+              <!-- Preset Info -->
+              <div id="animePresetGroup" class="input-subgroup" style="margin-top: 10px;">
+                <div class="preset-card">
+                  <span class="preset-icon">🚲</span>
+                  <div class="preset-info">
+                    <strong>Bihari Aura PS5 Bicycle Clip</strong>
+                    <small>Sample clip from your reference video ready for instant 1-click generation!</small>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Style & AI Engine Selection -->
+            <div class="form-section" style="margin-bottom: 18px;">
+              <label class="section-label" style="display: block; font-weight: 700; margin-bottom: 8px; color: #ffd700;">2. Animation & Comic Style</label>
+              <div class="style-cards-grid">
+                <div class="style-card active" onclick="selectAnimeStyle('hayao')" id="styleCardHayao">
+                  <span class="style-icon">🏯</span>
+                  <div class="style-title">Studio Ghibli / Hayao</div>
+                  <div class="style-desc">Hand-painted Japanese Anime Art (Local ONNX CPU)</div>
+                </div>
+                <div class="style-card" onclick="selectAnimeStyle('face_paint')" id="styleCardFacePaint">
+                  <span class="style-icon">🎭</span>
+                  <div class="style-title">Webtoon / Manga</div>
+                  <div class="style-desc">Crisp anime cel-shading & comic ink lines (Local ONNX)</div>
+                </div>
+                <div class="style-card" onclick="selectAnimeStyle('hf_animegan')" id="styleCardHF">
+                  <span class="style-icon">⚡</span>
+                  <div class="style-title">Hugging Face GPU</div>
+                  <div class="style-desc">Cloud GPU AnimeGANv2 (Using your Token: pop666)</div>
+                </div>
+                <div class="style-card" onclick="selectAnimeStyle('comic_cel')" id="styleCardCel">
+                  <span class="style-icon">💥</span>
+                  <div class="style-title">Fast Comic Cel-Shade</div>
+                  <div class="style-desc">Ultra-fast OpenCV Bilateral comic styling (Instant)</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Story Formula Mode -->
+            <div class="form-section" style="margin-bottom: 18px;">
+              <label class="section-label" style="display: block; font-weight: 700; margin-bottom: 8px; color: #ffd700;">3. Story Formula & Framing</label>
+              <div class="mode-selector-row">
+                <label class="mode-radio-box active" id="modeBoxPrequel">
+                  <input type="radio" name="animeMode" value="prequel_reveal" checked onchange="setAnimeStoryMode('prequel_reveal')" />
+                  <div class="mode-content">
+                    <strong>🔥 Prequel Story + Real Climax (Viral Formula)</strong>
+                    <p>Animated comic intro with speed lines & beat-drop bass, then plays the real reel!</p>
+                  </div>
+                </label>
+                <label class="mode-radio-box" id="modeBoxFull">
+                  <input type="radio" name="animeMode" value="full_anime" onchange="setAnimeStoryMode('full_anime')" />
+                  <div class="mode-content">
+                    <strong>🎬 Full Reel Anime Transformation</strong>
+                    <p>Entire video converted into animated anime motion art.</p>
+                  </div>
+                </label>
+              </div>
+            </div>
+
+            <!-- Meme Headlines -->
+            <div class="form-section" style="margin-bottom: 18px;">
+              <label class="section-label" style="display: block; font-weight: 700; margin-bottom: 8px; color: #ffd700;">4. Meme Banner & Captions</label>
+              <div class="input-subgroup">
+                <label class="input-lbl" style="font-size: 12px; color: #ddd;">Top Headline (Yellow Banner):</label>
+                <input type="text" id="animeTopTitle" class="styled-input" style="width: 100%; padding: 10px; border-radius: 8px; background: rgba(0,0,0,0.4); border: 1px solid #444; color: #fff;" value="BIHARI AURA DAY BY DAY 💀🔥" />
+              </div>
+              <div class="input-subgroup" style="margin-top: 8px;">
+                <label class="input-lbl" style="font-size: 12px; color: #ddd;">Bottom Caption / Subtitle:</label>
+                <input type="text" id="animeSubTitle" class="styled-input" style="width: 100%; padding: 10px; border-radius: 8px; background: rgba(0,0,0,0.4); border: 1px solid #444; color: #fff;" value="Wait For The Real Ending! 😂💸" />
+              </div>
+            </div>
+
+            <!-- Action Button -->
+            <button type="button" id="startAnimeBtn" class="primary-btn hero-action-btn" onclick="startAnimeGeneration()" style="width: 100%; padding: 14px; font-size: 16px; font-weight: 700; background: linear-gradient(135deg, #ff0844, #ffb199); border: none; border-radius: 8px; color: #fff; cursor: pointer; box-shadow: 0 4px 15px rgba(255, 8, 68, 0.4);">
+              <span>🔥 Generate Animated Reel (रील बनाओ)</span>
+            </button>
+          </div>
+
+          <!-- RIGHT COLUMN: Live Progress & Video Player -->
+          <div class="anime-right-panel">
+            <div class="preview-card" style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 16px;">
+              <div class="preview-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                <span class="preview-title" style="font-weight: 700; font-size: 14px;">📺 9:16 Video Preview</span>
+                <span id="animeStatusBadge" class="status-badge idle" style="padding: 3px 8px; border-radius: 10px; font-size: 11px; background: rgba(255,255,255,0.1); color: #aaa;">Ready</span>
+              </div>
+
+              <!-- Video Player or Placeholder -->
+              <div class="video-container" id="animeVideoContainer">
+                <video id="animeVideoPlayer" controls playsinline loop class="rendered-video" style="display: none;"></video>
+                <div id="animePlaceholder" class="video-placeholder">
+                  <div class="placeholder-icon">🎨</div>
+                  <p class="placeholder-text">Click "Generate Animated Reel" to see preview here</p>
+                  <small class="placeholder-sub">Output will be 1080x1920 HD 9:16 vertical reel ready for Instagram!</small>
+                </div>
+              </div>
+
+              <!-- Progress Box -->
+              <div id="animeProgressBox" class="progress-box" style="display: none; margin-top: 15px;">
+                <div class="progress-bar-container" style="height: 8px; background: rgba(255,255,255,0.1); border-radius: 4px; overflow: hidden;">
+                  <div id="animeProgressBar" class="progress-bar" style="width: 0%; height: 100%; background: linear-gradient(90deg, #ff0844, #ffb199); transition: width 0.3s ease;"></div>
+                </div>
+                <div class="progress-info-row" style="display: flex; justify-content: space-between; margin-top: 6px; font-size: 12px; color: #ffd700;">
+                  <span id="animeProgressMsg">Starting...</span>
+                  <span id="animeProgressPct">0%</span>
+                </div>
+              </div>
+
+              <!-- Result Actions -->
+              <div id="animeResultActions" class="result-actions" style="display: none; margin-top: 15px; display: flex; flex-direction: column; gap: 8px;">
+                <a id="animeDownloadLink" href="#" download="viral_anime_reel.mp4" class="primary-btn download-btn" style="text-align: center; text-decoration: none; padding: 10px; background: #28a745; color: #fff; border-radius: 6px; font-weight: 700;">
+                  <span>📥 Download 9:16 HD Video</span>
+                </a>
+                <button type="button" class="ig-nav-btn" onclick="publishAnimeReelToInstagram()" style="width: 100%; padding: 10px; border-radius: 6px; background: linear-gradient(45deg, #f09433, #e6683c, #dc2743, #cc2366, #bc1888); color: #fff; border: none; font-weight: 700; cursor: pointer;">
+                  <span>📸 Publish Directly to Instagram</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Mobile Bottom Navigation Dock (Fixed at bottom for easy thumb access) -->
   <nav class="mobile-bottom-nav" id="mobileBottomNav" aria-label="Mobile Navigation">
     <button class="m-nav-item active" id="mNavNews" type="button" title="Live News Feed">
@@ -1377,6 +1547,10 @@
     <button class="m-nav-item" id="mNavReel" type="button" title="9:16 Video Reels">
       <span class="m-nav-icon">🎬</span>
       <span class="m-nav-label">Reels</span>
+    </button>
+    <button class="m-nav-item" id="mNavAnime" type="button" onclick="openAnimeStudioModal()" title="AI Anime Reel">
+      <span class="m-nav-icon">🎨</span>
+      <span class="m-nav-label">Anime</span>
     </button>
     <button class="m-nav-item" id="mNavIg" type="button" title="Connect Instagram">
       <span class="m-nav-icon">📸</span>

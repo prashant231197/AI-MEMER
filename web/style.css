@@ -4599,3 +4599,196 @@ button:disabled {
   }
 }
 
+/* ============================================================== */
+/* AI REEL-TO-ANIME MEME STUDIO STYLES                            */
+/* ============================================================== */
+.anime-studio-box {
+  max-width: 1100px;
+  width: 95%;
+  max-height: 90vh;
+  overflow-y: auto;
+  border: 1px solid rgba(255, 65, 108, 0.4);
+  box-shadow: 0 0 40px rgba(255, 8, 68, 0.25);
+}
+
+.anime-studio-grid {
+  display: grid;
+  grid-template-columns: 1.2fr 0.9fr;
+  gap: 24px;
+}
+
+@media (max-width: 900px) {
+  .anime-studio-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.source-pills {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.source-pill {
+  padding: 8px 14px;
+  border-radius: var(--radius-pill);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.source-pill:hover, .source-pill.active {
+  background: linear-gradient(135deg, rgba(255, 8, 68, 0.25), rgba(255, 177, 153, 0.25));
+  border-color: #ff0844;
+  color: #ffffff;
+  box-shadow: 0 0 10px rgba(255, 8, 68, 0.3);
+}
+
+.preset-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  background: rgba(255, 215, 0, 0.08);
+  border: 1px solid rgba(255, 215, 0, 0.3);
+  border-radius: var(--radius-md);
+}
+
+.preset-icon {
+  font-size: 28px;
+}
+
+.preset-info strong {
+  display: block;
+  font-size: 14px;
+  color: #ffd700;
+}
+
+.preset-info small {
+  display: block;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.style-cards-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.style-card {
+  padding: 12px;
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.style-card:hover, .style-card.active {
+  background: rgba(255, 65, 108, 0.12);
+  border-color: #ff416c;
+  box-shadow: 0 0 12px rgba(255, 65, 108, 0.25);
+}
+
+.style-icon {
+  font-size: 22px;
+  display: block;
+  margin-bottom: 4px;
+}
+
+.style-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.style-desc {
+  font-size: 11px;
+  color: var(--text-muted);
+  line-height: 1.3;
+  margin-top: 2px;
+}
+
+.mode-selector-row {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.mode-radio-box {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px;
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.mode-radio-box:hover, .mode-radio-box.active {
+  border-color: #ffd700;
+  background: rgba(255, 215, 0, 0.06);
+}
+
+.mode-content strong {
+  display: block;
+  font-size: 13px;
+  color: #ffffff;
+}
+
+.mode-content p {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin: 3px 0 0;
+}
+
+.video-container {
+  aspect-ratio: 9/16;
+  max-height: 480px;
+  background: #0a0a12;
+  border-radius: var(--radius-lg);
+  border: 2px dashed rgba(255, 255, 255, 0.15);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  position: relative;
+  margin: 0 auto;
+}
+
+.rendered-video {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  background: #000;
+}
+
+.video-placeholder {
+  text-align: center;
+  padding: 24px;
+}
+
+.placeholder-icon {
+  font-size: 42px;
+  margin-bottom: 12px;
+}
+
+.placeholder-text {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.placeholder-sub {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+

@@ -45,6 +45,13 @@ try:
 except ImportError:
     imageio_ffmpeg = None
 
+try:
+    import reel_animator
+except Exception as _anim_err:
+    print(f"[ANIMATOR] Error importing reel_animator: {_anim_err}")
+    reel_animator = None
+
+
 
 # Ignore BS4 XML warnings
 warnings.filterwarnings("ignore", category=XMLParsedAsHTMLWarning)
@@ -2053,6 +2060,61 @@ class NewsServerHandler(http.server.SimpleHTTPRequestHandler):
             except Exception as e:
                 return self.send_json({"connected": False, "error": str(e)})
 
+        # Reel-to-Animation Status
+        if path == "/api/animate-reel-status":
+            job_id = query.get("job_id", [""])[0]
+            if not reel_animator:
+                return self.send_json({"status": "failed", "error": "Reel animator engine not loaded"}, status=500)
+            status_data = reel_animator.ANIMATOR_JOBS.get(job_id)
+            if not status_data:
+                return self.send_json({"status": "not_found", "error": f"Job {job_id} not found"}, status=404)
+            return self.send_json(status_data)
+
+        # Reel-to-Animation Presets
+        if path == "/api/sample-reel-presets":
+            return self.send_json({
+                "success": True,
+                "presets": [
+                    {
+                        "id": "bihari_aura",
+                        "title": "BIHARI AURA DAY BY DAY 💀🔥",
+                        "subtitle": "Wait For The Real Ending! 😂💸",
+                        "video_name": "sample_real_reel.mp4",
+                        "style": "hayao",
+                        "mode": "prequel_reveal",
+                        "anime_duration": 4.5
+                    },
+                    {
+                        "id": "bro_cooked",
+                        "title": "BRO REALLY COOKED THIS TIME 🤯💀",
+                        "subtitle": "Aura +10,000 | Legend Move! 🔥",
+                        "video_name": "sample_real_reel.mp4",
+                        "style": "face_paint",
+                        "mode": "prequel_reveal",
+                        "anime_duration": 4.0
+                    },
+                    {
+                        "id": "comic_action",
+                        "title": "WAIT FOR THE CLIMAX 😱💥",
+                        "subtitle": "Things escalated so quickly! 💀",
+                        "video_name": "sample_real_reel.mp4",
+                        "style": "comic_cel",
+                        "mode": "prequel_reveal",
+                        "anime_duration": 4.0
+                    }
+                ],
+                "styles": [
+                    {"id": "hayao", "name": "Studio Ghibli / Hayao Anime", "desc": "Classic hand-painted anime look (Local ONNX CPU)"},
+                    {"id": "face_paint", "name": "Modern Webtoon / Manga", "desc": "Crisp cel-shaded character art (Local ONNX CPU)"},
+                    {"id": "hf_animegan", "name": "Hugging Face AnimeGANv2 GPU", "desc": "Cloud GPU AI Stylization (Using your HF Token)"},
+                    {"id": "comic_cel", "name": "Fast Comic Cel-Shading", "desc": "Ultra fast bilateral ink outline (Instant)"}
+                ],
+                "modes": [
+                    {"id": "prequel_reveal", "name": "Prequel Story + Real Climax Reveal", "desc": "Animated comic story intro with speed lines & beat-drop, then plays the real reel!"},
+                    {"id": "full_anime", "name": "Full Reel Anime Transformation", "desc": "Converts entire video into cartoon anime motion"},
+                ]
+            })
+
         # Serve streaming video file
         if path == "/api/serve-video":
             video_name = query.get("name", ["sample_reel.mp4"])[0]
@@ -2445,6 +2507,27 @@ class NewsServerHandler(http.server.SimpleHTTPRequestHandler):
             except Exception as e:
                 print(f"[REEL RENDER] Error: {e}")
                 return self.send_json({"error": f"Failed to render reel: {str(e)}"}, status=500)
+
+        # AI Reel-to-Animation Meme Studio Endpoint
+        if path == "/api/animate-reel":
+            content_length = int(self.headers.get("Content-Length", 0))
+            post_body = self.rfile.read(content_length)
+            try:
+                payload = json.loads(post_body.decode("utf-8"))
+            except Exception:
+                payload = {}
+
+            if not reel_animator:
+                return self.send_json({"error": "Reel animator module could not be initialized"}, status=500)
+
+            job_id = f"anime_{int(time.time())}_{random.randint(100, 999)}"
+            reel_animator.start_async_animation_job(job_id, payload)
+            return self.send_json({
+                "success": True,
+                "job_id": job_id,
+                "message": "Animation job submitted successfully. Poll /api/animate-reel-status for progress."
+            })
+
 
         # Instagram Connect (Session ID or Username/Password)
         if path == "/api/instagram/connect":
