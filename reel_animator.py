@@ -31,8 +31,18 @@ os.makedirs(OUTPUT_DIR, exist_ok=True)
 try:
     import imageio_ffmpeg
     FFMPEG_BIN = imageio_ffmpeg.get_ffmpeg_exe()
+    FFMPEG_DIR = os.path.dirname(FFMPEG_BIN)
+    target_ffmpeg_exe = os.path.join(FFMPEG_DIR, "ffmpeg.exe")
+    if not os.path.exists(target_ffmpeg_exe) and os.path.exists(FFMPEG_BIN):
+        try:
+            shutil.copyfile(FFMPEG_BIN, target_ffmpeg_exe)
+        except Exception:
+            pass
+    if FFMPEG_DIR and FFMPEG_DIR not in os.environ.get("PATH", ""):
+        os.environ["PATH"] = FFMPEG_DIR + os.pathsep + os.environ.get("PATH", "")
 except Exception:
     FFMPEG_BIN = "ffmpeg"
+    FFMPEG_DIR = None
 
 _ONNX_SESSIONS = {}
 _HF_CLIENT = None
@@ -258,12 +268,14 @@ def download_reel(url, out_dir=None):
     out_tmpl = os.path.join(out_dir, "reel_dl_%(id)s.%(ext)s")
     
     ydl_opts = {
-        "format": "bestvideo+bestaudio/best",
+        "format": "best[ext=mp4]/bestvideo[ext=mp4]+bestaudio[ext=m4a]/bestvideo+bestaudio/best",
         "outtmpl": out_tmpl,
         "merge_output_format": "mp4",
         "quiet": True,
         "no_warnings": True,
     }
+    if FFMPEG_DIR and os.path.exists(FFMPEG_DIR):
+        ydl_opts["ffmpeg_location"] = FFMPEG_DIR
     
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         info = ydl.extract_info(url, download=True)

@@ -42,6 +42,16 @@ import yt_dlp
 import shutil
 try:
     import imageio_ffmpeg
+    _ff_bin = imageio_ffmpeg.get_ffmpeg_exe()
+    _ff_dir = os.path.dirname(_ff_bin)
+    _ff_exe = os.path.join(_ff_dir, "ffmpeg.exe")
+    if not os.path.exists(_ff_exe) and os.path.exists(_ff_bin):
+        try:
+            shutil.copyfile(_ff_bin, _ff_exe)
+        except Exception:
+            pass
+    if _ff_dir and _ff_dir not in os.environ.get("PATH", ""):
+        os.environ["PATH"] = _ff_dir + os.pathsep + os.environ.get("PATH", "")
 except ImportError:
     imageio_ffmpeg = None
 
