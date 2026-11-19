@@ -7463,22 +7463,21 @@ let latestRenderedAnimeFilename = null;
 function openAnimeStudioModal() {
   const modal = document.getElementById('animeStudioModal');
   if (modal) {
-    modal.style.display = 'flex';
-    document.body.style.overflow = 'hidden';
+    showModalElement(modal);
   }
 }
 
 function closeAnimeStudioModal() {
   const modal = document.getElementById('animeStudioModal');
   if (modal) {
-    modal.style.display = 'none';
-    document.body.style.overflow = '';
+    hideModalElement(modal);
   }
   if (activeAnimePollInterval) {
     clearInterval(activeAnimePollInterval);
     activeAnimePollInterval = null;
   }
 }
+
 
 function setAnimeSourceMode(mode) {
   currentAnimeSourceMode = mode;
@@ -7721,6 +7720,32 @@ window.setAnimeStoryMode = setAnimeStoryMode;
 window.handleAnimeFileSelected = handleAnimeFileSelected;
 window.startAnimeGeneration = startAnimeGeneration;
 window.publishAnimeReelToInstagram = publishAnimeReelToInstagram;
+
+// Safe event listeners for Anime Studio
+document.addEventListener('DOMContentLoaded', () => {
+  const animeModal = document.getElementById('animeStudioModal');
+  if (animeModal) {
+    animeModal.addEventListener('click', (e) => {
+      if (e.target === animeModal) {
+        closeAnimeStudioModal();
+      }
+    });
+  }
+  const openBtn = document.getElementById('openAnimeStudioNavBtn');
+  if (openBtn) {
+    openBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      openAnimeStudioModal();
+    });
+  }
+  const mobileBtn = document.getElementById('mNavAnime');
+  if (mobileBtn) {
+    mobileBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      openAnimeStudioModal();
+    });
+  }
+});
 
 // Start application
 window.addEventListener('DOMContentLoaded', init);
